@@ -24,19 +24,11 @@ let isCompiling = false;
 let pendingCode = null;
 let mixer = null;
 
-// --- Load Preferences ---
-pathTracingCb.checked =
-  localStorage.getItem("scad_preview_path_tracing") === "true";
-autoSmoothCb.checked =
-  localStorage.getItem("scad_preview_auto_smooth") === "true";
-
 pathTracingCb.addEventListener("change", () => {
-  localStorage.setItem("scad_preview_path_tracing", pathTracingCb.checked);
   if (pathTracingCb.checked && pathTracer) pathTracer.updateCamera();
 });
 
 autoSmoothCb.addEventListener("change", () => {
-  localStorage.setItem("scad_preview_auto_smooth", autoSmoothCb.checked);
   if (currentGltfData) {
     statusEl.innerText = "Building BVH & Scene...";
     // setTimeout defers the thread block allowing the UI to repaint the status first
