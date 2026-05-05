@@ -165,7 +165,7 @@ controls.addEventListener("change", () => pathTracer.updateCamera());
 
 // Environment & Lights (Updated to load local HDR)
 new HDRLoader().load(
-  "/aristea_wreck_puresky_2k.hdr",
+  "./aristea_wreck_puresky_2k.hdr",
   (texture) => {
     texture.mapping = THREE.EquirectangularReflectionMapping;
     scene.background = texture;
