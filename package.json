@@ -1,0 +1,20 @@
+{
+  "name": "openscad-gltf-viewer",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "format": "prettier --write ."
+  },
+  "dependencies": {
+    "openscad-gltf-wasm": "github:iliagrigorevdev/openscad-gltf-wasm",
+    "three": "^0.184.0",
+    "three-gpu-pathtracer": "^0.0.24"
+  },
+  "devDependencies": {
+    "prettier": "3.8.3",
+    "vite": "^6.0.0"
+  }
+}

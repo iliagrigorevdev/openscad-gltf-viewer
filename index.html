@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OpenSCAD GLTF Viewer</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <div id="app-container">
+      <!-- Left / Top Half: Controls -->
+      <div id="left-panel">
+        <div class="panel-section">
+          <h2>1. AI Prompt Generator</h2>
+          <p class="help-text">
+            Describe the object you want to generate. The copied prompt will
+            include advanced PBR and Animation rules.
+          </p>
+          <textarea
+            id="prompt-desc"
+            rows="2"
+            placeholder="e.g. A shiny gold ring with an embedded red gem"
+          ></textarea>
+          <button id="copy-prompt-btn">📋 Copy Prompt to Clipboard</button>
+        </div>
+
+        <div class="panel-section flex-grow">
+          <h2>2. SCAD Editor</h2>
+          <textarea
+            id="editor"
+            spellcheck="false"
+            placeholder="// Paste generated SCAD code here..."
+          ></textarea>
+
+          <div class="controls-row">
+            <button id="render-btn" class="primary">▶ Render</button>
+            <button id="download-scad-btn">⬇ SCAD</button>
+            <button id="export-gltf-btn">⬇ GLTF</button>
+          </div>
+          <div class="controls-row toggles">
+            <label
+              ><input type="checkbox" id="path-tracing-cb" /> Path
+              Tracing</label
+            >
+            <label
+              ><input type="checkbox" id="auto-smooth-cb" /> Auto Smooth</label
+            >
+          </div>
+        </div>
+      </div>
+
+      <!-- Right / Bottom Half: Viewer -->
+      <div id="right-panel">
+        <div id="status">Waiting for code...</div>
+        <div id="viewer"></div>
+      </div>
+    </div>
+
+    <script type="module" src="/main.js"></script>
+  </body>
+</html>
