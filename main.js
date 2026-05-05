@@ -7,6 +7,9 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { WebGLPathTracer } from "three-gpu-pathtracer";
 import { HDRLoader } from "three/examples/jsm/loaders/HDRLoader.js";
 
+// Import the default script from file as raw text (Vite feature)
+import defaultScad from "./default.scad?raw";
+
 // --- UI Elements ---
 const promptDescEl = document.getElementById("prompt-desc");
 const copyPromptBtn = document.getElementById("copy-prompt-btn");
@@ -92,7 +95,8 @@ async function compileAndRender(scadCode) {
   }
 }
 
-renderBtn.onclick = () => compileAndRender(editorEl.value);
+// Fallback to the defaultScad if the editor is empty
+renderBtn.onclick = () => compileAndRender(editorEl.value || defaultScad);
 
 // Editor Auto-Render Debounce
 let renderTimeout;
@@ -100,16 +104,14 @@ editorEl.addEventListener("input", (e) => {
   clearTimeout(renderTimeout);
   statusEl.innerText = "Waiting to compile...";
   renderTimeout = setTimeout(() => {
-    compileAndRender(e.target.value);
+    // Fallback to the defaultScad if the user clears the editor
+    compileAndRender(e.target.value || defaultScad);
   }, 800);
 });
 
 downloadScadBtn.onclick = () => {
-  if (!editorEl.value) return;
-  downloadBlob(
-    new Blob([editorEl.value], { type: "text/plain" }),
-    "model.scad",
-  );
+  const codeToSave = editorEl.value || defaultScad;
+  downloadBlob(new Blob([codeToSave], { type: "text/plain" }), "model.scad");
 };
 
 exportGltfBtn.onclick = () => {
@@ -618,23 +620,11 @@ window.addEventListener("resize", () => {
 });
 setTimeout(() => window.dispatchEvent(new Event("resize")), 100);
 
-// --- Initial Default Script ---
-const DEFAULT_SCAD = `// A shiny gold ring with a ruby gem
-$fn = 64;
-
-// Gold ring
-color(c=[1.0, 0.84, 0.0], metalness=1.0, roughness=0.1)
-rotate_extrude()
-translate([10, 0, 0])
-circle(r=2);
-
-// Ruby gem
-color(c=[0.8, 0.0, 0.2, 1.0], transmission=0.8, roughness=0.0, thickness=5.0)
-sphere(r=6);
-`;
+// --- Initialization ---
+// Display the script as a hint, leaving the text field functionally empty
+editorEl.placeholder = defaultScad;
 
 if (!editorEl.value.trim()) {
-  editorEl.value = DEFAULT_SCAD;
   // Trigger initial compile after a brief delay to ensure WASM loads smoothly
-  setTimeout(() => compileAndRender(DEFAULT_SCAD), 500);
+  setTimeout(() => compileAndRender(defaultScad), 500);
 }
