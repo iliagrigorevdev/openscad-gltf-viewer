@@ -18,6 +18,7 @@ const renderBtn = document.getElementById("render-btn");
 const loadScadBtn = document.getElementById("load-scad-btn");
 const downloadScadBtn = document.getElementById("download-scad-btn");
 const exportGltfBtn = document.getElementById("export-gltf-btn");
+const captureImageBtn = document.getElementById("capture-image-btn");
 const autoRenderCb = document.getElementById("auto-render-cb");
 const autoSmoothCb = document.getElementById("auto-smooth-cb");
 const pathTracingCb = document.getElementById("path-tracing-cb");
@@ -29,6 +30,7 @@ let currentGltfData = null;
 let isCompiling = false;
 let pendingCode = null;
 let mixer = null;
+let captureNextFrame = false;
 
 pathTracingCb.addEventListener("change", () => {
   if (pathTracingCb.checked && pathTracer) pathTracer.updateCamera();
@@ -152,6 +154,10 @@ exportGltfBtn.onclick = () => {
     new Blob([currentGltfData], { type: "application/octet-stream" }),
     "model.glb",
   );
+};
+
+captureImageBtn.onclick = () => {
+  captureNextFrame = true;
 };
 
 function downloadBlob(blob, filename) {
@@ -681,6 +687,15 @@ function animate() {
   } else {
     lightGroup.visible = true;
     renderer.render(scene, camera);
+  }
+
+  // Capture frame buffer immediately after rendering
+  if (captureNextFrame) {
+    captureNextFrame = false;
+    // Using toBlob is more efficient for high-res images than toDataURL
+    renderer.domElement.toBlob((blob) => {
+      if (blob) downloadBlob(blob, "render.png");
+    }, "image/png");
   }
 }
 animate();
