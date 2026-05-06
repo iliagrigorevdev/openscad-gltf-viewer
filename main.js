@@ -15,6 +15,7 @@ const promptDescEl = document.getElementById("prompt-desc");
 const copyPromptBtn = document.getElementById("copy-prompt-btn");
 const editorEl = document.getElementById("editor");
 const renderBtn = document.getElementById("render-btn");
+const loadScadBtn = document.getElementById("load-scad-btn");
 const downloadScadBtn = document.getElementById("download-scad-btn");
 const exportGltfBtn = document.getElementById("export-gltf-btn");
 const autoRenderCb = document.getElementById("auto-render-cb");
@@ -119,6 +120,26 @@ autoRenderCb.addEventListener("change", () => {
     compileAndRender(editorEl.value || defaultScad);
   }
 });
+
+loadScadBtn.onclick = () => {
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = ".scad";
+  input.onchange = async (e) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const file = e.target.files[0];
+      try {
+        const text = await file.text();
+        editorEl.value = text;
+        compileAndRender(text);
+      } catch (err) {
+        console.error("Failed to read file", err);
+        alert("Failed to read file: " + err.message);
+      }
+    }
+  };
+  input.click();
+};
 
 downloadScadBtn.onclick = () => {
   const codeToSave = editorEl.value || defaultScad;
