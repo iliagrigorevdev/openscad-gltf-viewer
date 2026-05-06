@@ -4,6 +4,8 @@ A modern, web-based editor and 3D viewer for OpenSCAD. It natively compiles `.sc
 
 **🌐 Live Demo:** [openscad-gltf-viewer](https://iliagrigorevdev.github.io/openscad-gltf-viewer/)
 
+![OpenSCAD GLTF Viewer Screenshot](screenshot.png)
+
 ## ✨ Features
 
 - **100% Client-Side Compilation**: Compiles OpenSCAD scripts directly to `.glb` binaries entirely in the browser using [`openscad-gltf-wasm`](https://github.com/iliagrigorevdev/openscad-gltf-wasm). No backend server is required.
@@ -68,7 +70,7 @@ armature(animations = [
 }
 ```
 
-_(For full syntax documentation, see the [openscad-gltf-wasm documentation](https://github.com/iliagrigorevdev/openscad-gltf-wasm))._
+_(For full syntax, see the [openscad-gltf-wasm](https://github.com/iliagrigorevdev/openscad-gltf-wasm))._
 
 ## Assets
 
