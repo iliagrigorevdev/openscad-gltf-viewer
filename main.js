@@ -33,7 +33,10 @@ let mixer = null;
 let captureNextFrame = false;
 
 pathTracingCb.addEventListener("change", () => {
-  if (pathTracingCb.checked && pathTracer) pathTracer.updateCamera();
+  if (pathTracingCb.checked && pathTracer) {
+    // Rebuild the BVH and refresh the scene graph to match the current animation frame
+    pathTracer.setScene(scene, camera);
+  }
 });
 
 autoSmoothCb.addEventListener("change", () => {
@@ -678,7 +681,8 @@ function animate() {
   const delta = (now - lastTime) / 1000;
   lastTime = now;
 
-  if (mixer) mixer.update(delta);
+  // Pause animation while path tracing to correctly accumulate over the frozen geometry
+  if (mixer && !pathTracingCb.checked) mixer.update(delta);
   controls.update();
 
   if (pathTracingCb.checked) {
