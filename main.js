@@ -17,8 +17,9 @@ const editorEl = document.getElementById("editor");
 const renderBtn = document.getElementById("render-btn");
 const downloadScadBtn = document.getElementById("download-scad-btn");
 const exportGltfBtn = document.getElementById("export-gltf-btn");
-const pathTracingCb = document.getElementById("path-tracing-cb");
+const autoRenderCb = document.getElementById("auto-render-cb");
 const autoSmoothCb = document.getElementById("auto-smooth-cb");
+const pathTracingCb = document.getElementById("path-tracing-cb");
 const statusEl = document.getElementById("status");
 const viewerEl = document.getElementById("viewer");
 
@@ -102,11 +103,21 @@ renderBtn.onclick = () => compileAndRender(editorEl.value || defaultScad);
 let renderTimeout;
 editorEl.addEventListener("input", (e) => {
   clearTimeout(renderTimeout);
+  if (!autoRenderCb.checked) {
+    statusEl.innerText = "Changes pending (click Render)";
+    return;
+  }
   statusEl.innerText = "Waiting to compile...";
   renderTimeout = setTimeout(() => {
     // Fallback to the defaultScad if the user clears the editor
     compileAndRender(e.target.value || defaultScad);
   }, 800);
+});
+
+autoRenderCb.addEventListener("change", () => {
+  if (autoRenderCb.checked) {
+    compileAndRender(editorEl.value || defaultScad);
+  }
 });
 
 downloadScadBtn.onclick = () => {

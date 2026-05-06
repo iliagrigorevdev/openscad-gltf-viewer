@@ -25,7 +25,7 @@ A modern, web-based editor and 3D viewer for OpenSCAD. It natively compiles `.sc
 
 ### 2. The SCAD Editor
 
-- The editor automatically compiles and updates the 3D viewer when you stop typing (debounced at 800ms).
+- Toggle **Auto Render** to automatically compile and update the 3D viewer when you stop typing (debounced at 800ms). Enabled by default.
 - You can manually trigger a render using the **▶ Render** button.
 - Use **⬇ SCAD** or **⬇ GLTF** to download your work.
 
