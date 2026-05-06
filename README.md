@@ -8,7 +8,7 @@ A modern, web-based editor and 3D viewer for OpenSCAD. It natively compiles `.sc
 
 - **100% Client-Side Compilation**: Compiles OpenSCAD scripts directly to `.glb` binaries entirely in the browser using [`openscad-gltf-wasm`](https://github.com/iliagrigorevdev/openscad-gltf-wasm). No backend server is required.
 - **Photorealistic GPU Path Tracing**: Toggle on **Path Tracing** for incredibly realistic lighting, soft shadows, and physically accurate glass refractions/transmissions powered by `three-gpu-pathtracer`.
-- **Extended PBR Support**: Visualize advanced material properties extending standard OpenSCAD, including `metalness`, `roughness`, `transmission` (glass), `clearcoat`, and `sheen`.
+- **Extended PBR Support**: Visualize advanced material properties extending standard OpenSCAD, including `metalness`, `roughness`, `transmission` (glass), `clearcoat`, `sheen`, `ior`, `emissive`, `specular`, `iridescence`, and `anisotropy`.
 - **Skeletal Animations**: Fully supports parsing and playing hierarchical bone animations defined in the custom SCAD engine.
 - **Auto Smooth Geometry**: Toggle on **Auto Smooth** to automatically calculate and apply smooth vertex normals to blocky CAD geometry using a custom angle-based normal welding algorithm.
 - **Drag-and-Drop Support**: Instantly load existing scripts by dragging and dropping any `.scad` file directly into the browser window.
@@ -51,7 +51,7 @@ Because this viewer uses a custom fork of OpenSCAD, you can use powerful new syn
 **PBR Materials:**
 
 ```openscad
-color("white", roughness = 0.1, metalness = 1.0, clearcoat = 1.0) {
+color("white", roughness = 0.1, metalness = 1.0, clearcoat = 1.0, iridescence = 1.0, emissive = [0.2, 0.5, 1.0], emissiveIntensity = 2.0) {
     sphere(r=10);
 }
 ```
