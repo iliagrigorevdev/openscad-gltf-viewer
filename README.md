@@ -11,6 +11,7 @@ A modern, web-based editor and 3D viewer for OpenSCAD. It natively compiles `.sc
 - **Extended PBR Support**: Visualize advanced material properties extending standard OpenSCAD, including `metalness`, `roughness`, `transmission` (glass), `clearcoat`, and `sheen`.
 - **Skeletal Animations**: Fully supports parsing and playing hierarchical bone animations defined in the custom SCAD engine.
 - **Auto Smooth Geometry**: Toggle on **Auto Smooth** to automatically calculate and apply smooth vertex normals to blocky CAD geometry using a custom angle-based normal welding algorithm.
+- **Drag-and-Drop Support**: Instantly load existing scripts by dragging and dropping any `.scad` file directly into the browser window.
 - **AI Prompt Generator**: Because LLMs don't know about this engine's custom syntax, the viewer includes a built-in tool to generate AI-ready prompts. Describe your object, copy the prompt, and paste it into Gemini or Claude to get perfectly compatible SCAD code!
 - **Instant Export**: Download your `.scad` source code or export the resulting standard `.glb` file for use in Blender, Unity, or other 3D software.
 
@@ -25,6 +26,7 @@ A modern, web-based editor and 3D viewer for OpenSCAD. It natively compiles `.sc
 
 ### 2. The SCAD Editor
 
+- **Drag and Drop**: You can drag a `.scad` file from your computer and drop it anywhere on the app to instantly load its contents into the editor and trigger a render.
 - Toggle **Auto Render** to automatically compile and update the 3D viewer when you stop typing (debounced at 800ms). Enabled by default.
 - You can manually trigger a render using the **▶ Render** button.
 - Use **⬇ SCAD** or **⬇ GLTF** to download your work.

@@ -144,6 +144,51 @@ function downloadBlob(blob, filename) {
   URL.revokeObjectURL(url);
 }
 
+// --- Drag and Drop SCAD ---
+const dragOverlay = document.getElementById("drag-overlay");
+
+window.addEventListener("dragenter", (e) => {
+  e.preventDefault();
+  dragOverlay.classList.add("active");
+});
+
+window.addEventListener("dragover", (e) => {
+  e.preventDefault();
+  dragOverlay.classList.add("active");
+});
+
+dragOverlay.addEventListener("dragleave", (e) => {
+  e.preventDefault();
+  dragOverlay.classList.remove("active");
+});
+
+window.addEventListener("drop", async (e) => {
+  e.preventDefault();
+  dragOverlay.classList.remove("active");
+
+  if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+    const file = e.dataTransfer.files[0];
+
+    // Check for scad extension or text fallback
+    if (
+      file.name.toLowerCase().endsWith(".scad") ||
+      !file.type ||
+      file.type.includes("text")
+    ) {
+      try {
+        const text = await file.text();
+        editorEl.value = text;
+        compileAndRender(text);
+      } catch (err) {
+        console.error("Failed to read file", err);
+        alert("Failed to read file: " + err.message);
+      }
+    } else {
+      alert("Please drop a valid .scad file.");
+    }
+  }
+});
+
 // --- Three.js Setup ---
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(
