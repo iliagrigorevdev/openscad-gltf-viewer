@@ -221,6 +221,8 @@ window.addEventListener("drop", async (e) => {
 
 // --- Three.js Setup ---
 const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0x8899aa, 200, 1000);
+
 const camera = new THREE.PerspectiveCamera(
   60,
   viewerEl.clientWidth / viewerEl.clientHeight,
@@ -278,7 +280,7 @@ lightGroup.add(dirLight);
 lightGroup.add(dirLight.target);
 
 const floor = new THREE.Mesh(
-  new THREE.PlaneGeometry(2000, 2000),
+  new THREE.PlaneGeometry(10000, 10000),
   new THREE.MeshStandardMaterial({
     color: 0x222222,
     roughness: 0.8,
