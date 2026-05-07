@@ -60,8 +60,20 @@ autoSmoothCb.addEventListener("change", () => {
 // --- Prompt Logic ---
 copyPromptBtn.onclick = async () => {
   const desc = promptDescEl.value.trim() || "an object";
+
+  const options = {
+    basic: document.getElementById("opt-pbr-basic").checked,
+    transmission: document.getElementById("opt-pbr-transmission").checked,
+    clearcoat: document.getElementById("opt-pbr-clearcoat").checked,
+    sheen: document.getElementById("opt-pbr-sheen").checked,
+    emissive: document.getElementById("opt-pbr-emissive").checked,
+    specular: document.getElementById("opt-pbr-specular").checked,
+    iridescence: document.getElementById("opt-pbr-iridescence").checked,
+    animation: document.getElementById("opt-anim").checked,
+  };
+
   // Generated using the new JavaScript module export
-  const promptText = generatePrompt(desc);
+  const promptText = generatePrompt(desc, options);
 
   try {
     await navigator.clipboard.writeText(promptText);

@@ -14,8 +14,40 @@
           <h2>1. AI Prompt Generator</h2>
           <p class="help-text">
             Describe the object you want to generate. The copied prompt will
-            include advanced PBR and Animation rules.
+            include advanced PBR and Animation rules based on your selection.
           </p>
+          <div id="prompt-options" class="toggles">
+            <label
+              ><input type="checkbox" id="opt-pbr-basic" checked /> Basic
+              PBR</label
+            >
+            <label
+              ><input type="checkbox" id="opt-pbr-transmission" checked />
+              Transmission</label
+            >
+            <label
+              ><input type="checkbox" id="opt-pbr-clearcoat" checked />
+              Clearcoat</label
+            >
+            <label
+              ><input type="checkbox" id="opt-pbr-sheen" checked /> Sheen</label
+            >
+            <label
+              ><input type="checkbox" id="opt-pbr-emissive" checked />
+              Emissive</label
+            >
+            <label
+              ><input type="checkbox" id="opt-pbr-specular" checked />
+              Specular</label
+            >
+            <label
+              ><input type="checkbox" id="opt-pbr-iridescence" checked />
+              Iridescence</label
+            >
+            <label
+              ><input type="checkbox" id="opt-anim" checked /> Animations</label
+            >
+          </div>
           <textarea
             id="prompt-desc"
             rows="2"
