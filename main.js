@@ -23,6 +23,7 @@ const captureImageBtn = document.getElementById("capture-image-btn");
 const autoRenderCb = document.getElementById("auto-render-cb");
 const autoSmoothCb = document.getElementById("auto-smooth-cb");
 const pathTracingCb = document.getElementById("path-tracing-cb");
+const exportBinaryCb = document.getElementById("export-binary-cb");
 const statusEl = document.getElementById("status");
 const viewerEl = document.getElementById("viewer");
 
@@ -99,7 +100,11 @@ async function compileAndRender(scadCode) {
   statusEl.innerText = "Compiling WASM...";
 
   try {
-    currentGltfData = await convertScadToGltf(scadCode, wasmUrl);
+    const isBinary = exportBinaryCb.checked;
+    currentGltfData = await convertScadToGltf(scadCode, {
+      wasmUrl: wasmUrl,
+      binary: isBinary,
+    });
     statusEl.innerText = "Building BVH & Scene...";
     await rebuildSceneFromGLTF(currentGltfData);
     statusEl.innerText = "Rendering";
@@ -140,6 +145,12 @@ autoRenderCb.addEventListener("change", () => {
   }
 });
 
+exportBinaryCb.addEventListener("change", () => {
+  if (autoRenderCb.checked) {
+    compileAndRender(editorEl.value || defaultScad);
+  }
+});
+
 loadScadBtn.onclick = () => {
   const input = document.createElement("input");
   input.type = "file";
@@ -166,30 +177,40 @@ downloadScadBtn.onclick = () => {
 };
 
 exportGltfBtn.onclick = () => {
-  if (autoSmoothCb.checked && currentMesh) {
+  const isBinary = exportBinaryCb.checked;
+
+  if (!autoSmoothCb.checked && currentGltfData) {
+    const ext = isBinary ? "glb" : "gltf";
+    const type = isBinary ? "application/octet-stream" : "text/plain";
+    downloadBlob(new Blob([currentGltfData], { type }), `model.${ext}`);
+    return;
+  }
+
+  if (currentMesh) {
     const exporter = new GLTFExporter();
-    const options = { binary: true };
+    const options = { binary: isBinary };
     if (currentAnimations && currentAnimations.length > 0) {
       options.animations = currentAnimations;
     }
     exporter.parse(
       currentMesh,
       (gltf) => {
-        downloadBlob(
-          new Blob([gltf], { type: "application/octet-stream" }),
-          "model.glb",
-        );
+        if (isBinary) {
+          downloadBlob(
+            new Blob([gltf], { type: "application/octet-stream" }),
+            "model.glb",
+          );
+        } else {
+          downloadBlob(
+            new Blob([JSON.stringify(gltf, null, 2)], { type: "text/plain" }),
+            "model.gltf",
+          );
+        }
       },
       (error) => {
         console.error("An error happened during GLTF export:", error);
       },
       options,
-    );
-  } else {
-    if (!currentGltfData) return;
-    downloadBlob(
-      new Blob([currentGltfData], { type: "application/octet-stream" }),
-      "model.glb",
     );
   }
 };
