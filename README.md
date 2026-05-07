@@ -80,7 +80,9 @@ color("white", roughness = 0.1, metalness = 1.0, clearcoat = 1.0, iridescence = 
 
 ```openscad
 armature(animations = [
-  ["Rotor", [[0.0, [0,0,0]], [1.0, [0,90,0]], [2.0, [0,180,0]]]]
+  ["Spin", [
+    ["Rotor", [[0.0, [0,0,0]], [1.0, [0,90,0]], [2.0, [0,180,0]]]]
+  ]]
 ]) {
     bone(name="Rotor") {
         cylinder(h=5, r=10);

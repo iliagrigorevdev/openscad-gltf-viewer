@@ -4,29 +4,31 @@ $fn = 64;
 // Animation Data Dictionary
 // Subdividing 360-degree rotations into 90-degree increments to adhere to glTF shortest-path interpolation rules.
 anim_data = [
-    ["OuterRing", [
-        // Rotates around the X-axis
-        [0.0, [0, 0, 0]],
-        [1.0, [90, 0, 0]],
-        [2.0, [180, 0, 0]],
-        [3.0, [270, 0, 0]],
-        [4.0, [360, 0, 0]]
-    ]],
-    ["InnerRing", [
-        // Rotates backwards around the Y-axis (relative to OuterRing)
-        [0.0, [0, 0, 0]],
-        [1.0, [0, -90, 0]],
-        [2.0, [0, -180, 0]],
-        [3.0, [0, -270, 0]],
-        [4.0, [0, -360, 0]]
-    ]],
-    ["Gem", [
-        // Rotates around the Z-axis while hovering up and down on the Z-axis
-        [0.0, [0, 0, 0],   [0, 0, 0]],
-        [1.0, [0, 0, 90],  [0, 0, 2]],
-        [2.0, [0, 0, 180], [0, 0, 0]],
-        [3.0, [0, 0, 270], [0, 0, -2]],
-        [4.0, [0, 0, 360], [0, 0, 0]]
+    ["OrbitalMotion", [
+        ["OuterRing", [
+            // Rotates around the X-axis
+            [0.0, [0, 0, 0]],
+            [1.0, [90, 0, 0]],
+            [2.0, [180, 0, 0]],
+            [3.0, [270, 0, 0]],
+            [4.0, [360, 0, 0]]
+        ]],
+        ["InnerRing", [
+            // Rotates backwards around the Y-axis (relative to OuterRing)
+            [0.0, [0, 0, 0]],
+            [1.0, [0, -90, 0]],
+            [2.0, [0, -180, 0]],
+            [3.0, [0, -270, 0]],
+            [4.0, [0, -360, 0]]
+        ]],
+        ["Gem", [
+            // Rotates around the Z-axis while hovering up and down on the Z-axis
+            [0.0, [0, 0, 0],   [0, 0, 0]],
+            [1.0, [0, 0, 90],  [0, 0, 2]],
+            [2.0, [0, 0, 180], [0, 0, 0]],
+            [3.0, [0, 0, 270], [0, 0, -2]],
+            [4.0, [0, 0, 360], [0, 0, 0]]
+        ]]
     ]]
 ];
 
