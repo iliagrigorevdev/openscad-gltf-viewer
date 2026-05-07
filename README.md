@@ -15,7 +15,7 @@ A modern, web-based editor and 3D viewer for OpenSCAD. It natively compiles `.sc
 - **Auto Smooth Geometry**: Toggle on **Auto Smooth** to automatically calculate and apply smooth vertex normals to blocky CAD geometry using a custom angle-based normal welding algorithm.
 - **Drag-and-Drop Support**: Instantly load existing scripts by dragging and dropping any `.scad` file directly into the browser window.
 - **AI Prompt Generator**: Because LLMs don't know about this engine's custom syntax, the viewer includes a built-in tool to generate AI-ready prompts. Describe your object, copy the prompt, and paste it into Gemini or Claude to get perfectly compatible SCAD code!
-- **Instant Export**: Download your `.scad` source code or export the resulting standard `.glb` file for use in Blender, Unity, or other 3D software.
+- **Instant Export & Image Capture**: Download your `.scad` source code, export the resulting standard `.glb` file (which automatically bakes in your smoothed geometry and animations), or instantly save a `.png` screenshot of your current render viewport.
 
 ## 🎮 How to Use
 
@@ -28,16 +28,29 @@ A modern, web-based editor and 3D viewer for OpenSCAD. It natively compiles `.sc
 
 ### 2. The SCAD Editor
 
-- **Drag and Drop**: You can drag a `.scad` file from your computer and drop it anywhere on the app to instantly load its contents into the editor and trigger a render.
-- Toggle **Auto Render** to automatically compile and update the 3D viewer when you stop typing (debounced at 800ms). Enabled by default.
+- **Load & Drag-and-Drop**: Click the **📁 Load** button to open a file dialog, or drag a `.scad` file from your computer and drop it anywhere on the app to instantly load its contents into the editor and trigger a render.
+- Toggle **Auto Render** to automatically compile and update the 3D viewer when you stop typing (debounced at 800ms). Enabled by default. (Note: If the editor is empty, it will fall back to a default sample scene).
 - You can manually trigger a render using the **▶ Render** button.
-- Use **⬇ SCAD** or **⬇ GLTF** to download your work.
+- Use **⬇ SCAD** or **⬇ GLTF** to download your work. _(Note: If "Auto Smooth" is enabled, the `.glb` export will preserve the computed smooth vertex normals!)_
+- Use **📷 Image** to capture and download a high-quality `.png` screenshot of the 3D viewport.
 
 ### 3. Viewer Controls
 
 - **Orbit Controls**: Left-click and drag to rotate, right-click and drag to pan, scroll to zoom.
 - **Path Tracing Toggle**: Switches from the standard WebGL rasterizer to a physically-based path tracer. This is highly recommended for materials with `transmission` (glass/water) to see accurate refractions.
 - **Auto Smooth Toggle**: Averages face normals based on a crease angle, instantly giving your faceted models a smooth, modern 3D look.
+
+## 🚀 Local Development
+
+To run this project locally, ensure you have [Node.js](https://nodejs.org/) installed:
+
+```bash
+# Install dependencies
+npm install
+
+# Start the Vite development server
+npm run dev
+```
 
 ## 🛠 Tech Stack
 
