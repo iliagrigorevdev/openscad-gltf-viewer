@@ -6,6 +6,7 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { WebGLPathTracer } from "three-gpu-pathtracer";
 import { HDRLoader } from "three/examples/jsm/loaders/HDRLoader.js";
+import { GLTFExporter } from "three/examples/jsm/exporters/GLTFExporter.js";
 
 // Import the default script from file as raw text (Vite feature)
 import defaultScad from "./default.scad?raw";
@@ -27,6 +28,7 @@ const viewerEl = document.getElementById("viewer");
 
 let currentMesh = null;
 let currentGltfData = null;
+let currentAnimations = [];
 let isCompiling = false;
 let pendingCode = null;
 let mixer = null;
@@ -152,11 +154,32 @@ downloadScadBtn.onclick = () => {
 };
 
 exportGltfBtn.onclick = () => {
-  if (!currentGltfData) return;
-  downloadBlob(
-    new Blob([currentGltfData], { type: "application/octet-stream" }),
-    "model.glb",
-  );
+  if (autoSmoothCb.checked && currentMesh) {
+    const exporter = new GLTFExporter();
+    const options = { binary: true };
+    if (currentAnimations && currentAnimations.length > 0) {
+      options.animations = currentAnimations;
+    }
+    exporter.parse(
+      currentMesh,
+      (gltf) => {
+        downloadBlob(
+          new Blob([gltf], { type: "application/octet-stream" }),
+          "model.glb",
+        );
+      },
+      (error) => {
+        console.error("An error happened during GLTF export:", error);
+      },
+      options,
+    );
+  } else {
+    if (!currentGltfData) return;
+    downloadBlob(
+      new Blob([currentGltfData], { type: "application/octet-stream" }),
+      "model.glb",
+    );
+  }
 };
 
 captureImageBtn.onclick = () => {
@@ -584,10 +607,11 @@ function rebuildSceneFromGLTF(gltfData) {
       "",
       (gltf) => {
         currentMesh = gltf.scene;
+        currentAnimations = gltf.animations || [];
 
-        if (gltf.animations?.length) {
+        if (currentAnimations.length) {
           mixer = new THREE.AnimationMixer(currentMesh);
-          gltf.animations.forEach((clip) => mixer.clipAction(clip).play());
+          currentAnimations.forEach((clip) => mixer.clipAction(clip).play());
         }
 
         currentMesh.traverse((child) => {
