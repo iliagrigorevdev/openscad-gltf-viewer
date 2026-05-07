@@ -2,6 +2,7 @@ import { defineConfig } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
 
 export default defineConfig({
+  base: "/openscad-gltf-viewer/",
   plugins: [
     VitePWA({
       registerType: "autoUpdate",
@@ -18,16 +19,21 @@ export default defineConfig({
         theme_color: "#222222",
         background_color: "#222222",
         display: "standalone",
+        scope: "/openscad-gltf-viewer/",
+        id: "/openscad-gltf-viewer/",
+        start_url: "/openscad-gltf-viewer/",
         icons: [
           {
             src: "icon.png",
             sizes: "192x192",
             type: "image/png",
+            purpose: "any",
           },
           {
             src: "icon.png",
             sizes: "512x512",
             type: "image/png",
+            purpose: "maskable",
           },
         ],
       },
