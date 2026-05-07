@@ -776,7 +776,38 @@ function rebuildSceneFromGLTF(gltfData) {
 
         if (currentAnimations.length) {
           mixer = new THREE.AnimationMixer(currentMesh);
-          currentAnimations.forEach((clip) => mixer.clipAction(clip).play());
+
+          if (currentAnimations.length === 1) {
+            // --- SINGLE ANIMATION MODE ---
+            // Play the only animation on a loop (default behavior)
+            mixer.clipAction(currentAnimations[0]).play();
+          } else {
+            // --- MULTI-ANIMATION SEQUENTIAL MODE ---
+            let currentAnimIndex = 0;
+
+            const playAnimationSequence = (index) => {
+              const clip = currentAnimations[index];
+              const action = mixer.clipAction(clip);
+
+              action.reset();
+              // Play once so it triggers the 'finished' event
+              action.setLoop(THREE.LoopOnce);
+              action.clampWhenFinished = true;
+              action.play();
+
+              if (statusEl) statusEl.innerText = `Playing: ${clip.name}`;
+            };
+
+            // Listen for the end of the current clip to trigger the next
+            mixer.addEventListener("finished", () => {
+              currentAnimIndex =
+                (currentAnimIndex + 1) % currentAnimations.length;
+              playAnimationSequence(currentAnimIndex);
+            });
+
+            // Start the first animation in the list
+            playAnimationSequence(currentAnimIndex);
+          }
         }
 
         currentMesh.traverse((child) => {
