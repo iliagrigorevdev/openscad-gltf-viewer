@@ -20,6 +20,7 @@ const loadScadBtn = document.getElementById("load-scad-btn");
 const downloadScadBtn = document.getElementById("download-scad-btn");
 const exportGltfBtn = document.getElementById("export-gltf-btn");
 const captureImageBtn = document.getElementById("capture-image-btn");
+const shareBtn = document.getElementById("share-btn");
 const autoRenderCb = document.getElementById("auto-render-cb");
 const autoSmoothCb = document.getElementById("auto-smooth-cb");
 const pathTracingCb = document.getElementById("path-tracing-cb");
@@ -217,6 +218,137 @@ exportGltfBtn.onclick = () => {
 
 captureImageBtn.onclick = () => {
   captureNextFrame = true;
+};
+
+// --- Share Logic ---
+function padBase64(str) {
+  const mod = str.length % 4;
+  if (mod === 2) return str + "==";
+  if (mod === 3) return str + "=";
+  return str;
+}
+
+async function encodeCode(code) {
+  try {
+    if (typeof CompressionStream !== "undefined") {
+      const stream = new Blob([code])
+        .stream()
+        .pipeThrough(new CompressionStream("deflate-raw"));
+      const buffer = await new Response(stream).arrayBuffer();
+      const bytes = new Uint8Array(buffer);
+      let binary = "";
+      for (let i = 0; i < bytes.length; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      return (
+        "c" +
+        btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")
+      );
+    }
+  } catch (e) {
+    console.warn("CompressionStream failed, falling back to uncompressed", e);
+  }
+  return (
+    "u" +
+    btoa(unescape(encodeURIComponent(code)))
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/, "")
+  );
+}
+
+async function decodeCode(hash) {
+  const type = hash.charAt(0);
+  let data = hash.substring(1);
+  data = padBase64(data.replace(/-/g, "+").replace(/_/g, "/"));
+
+  if (type === "c") {
+    const binary = atob(data);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    const stream = new Blob([bytes])
+      .stream()
+      .pipeThrough(new DecompressionStream("deflate-raw"));
+    const buffer = await new Response(stream).arrayBuffer();
+    return new TextDecoder().decode(buffer);
+  } else if (type === "u") {
+    return decodeURIComponent(escape(atob(data)));
+  } else {
+    // legacy / fallback
+    try {
+      return decodeURIComponent(
+        escape(atob(padBase64(hash.replace(/-/g, "+").replace(/_/g, "/")))),
+      );
+    } catch {
+      return decodeURIComponent(hash);
+    }
+  }
+}
+
+shareBtn.onclick = async () => {
+  const code = editorEl.value.trim();
+  const url = new URL(window.location.href);
+  let finalUrl = "";
+
+  // If content is empty or perfectly matches the default script, share the clean base URL
+  if (!code || code === defaultScad.trim()) {
+    // origin + pathname + search safely constructs the URL without any #hash
+    finalUrl = url.origin + url.pathname + url.search;
+  } else {
+    try {
+      // Encode the un-trimmed value to preserve formatting
+      const hash = await encodeCode(editorEl.value);
+      url.hash = hash;
+      finalUrl = url.toString();
+    } catch (err) {
+      console.warn("Encoding failed, falling back to base URL.", err);
+      finalUrl = url.origin + url.pathname + url.search;
+    }
+  }
+
+  // Update the URL in the browser without reloading
+  window.history.replaceState(null, "", finalUrl);
+
+  try {
+    if (navigator.share) {
+      await navigator.share({
+        title: "OpenSCAD GLTF Viewer",
+        text: "Check out this 3D model in the OpenSCAD GLTF Viewer!",
+        url: finalUrl,
+      });
+      const originalText = shareBtn.innerText;
+      shareBtn.innerText = "✅ Shared!";
+      setTimeout(() => {
+        shareBtn.innerText = originalText;
+      }, 2000);
+    } else {
+      // Fallback to clipboard if Web Share API is not supported
+      await navigator.clipboard.writeText(finalUrl);
+      const originalText = shareBtn.innerText;
+      shareBtn.innerText = "✅ Copied Link!";
+      setTimeout(() => {
+        shareBtn.innerText = originalText;
+      }, 2000);
+    }
+  } catch (err) {
+    // Ignore errors where the user intentionally closed the share dialog
+    if (err.name !== "AbortError") {
+      console.error("Share failed", err);
+      // Try fallback if native share failed for an unexpected reason
+      try {
+        await navigator.clipboard.writeText(finalUrl);
+        const originalText = shareBtn.innerText;
+        shareBtn.innerText = "✅ Copied Link!";
+        setTimeout(() => {
+          shareBtn.innerText = originalText;
+        }, 2000);
+      } catch (fallbackErr) {
+        alert("Failed to share or copy link.");
+      }
+    }
+  }
 };
 
 function downloadBlob(blob, filename) {
@@ -777,7 +909,23 @@ setTimeout(() => window.dispatchEvent(new Event("resize")), 100);
 // Display the script as a hint, leaving the text field functionally empty
 editorEl.placeholder = defaultScad;
 
-if (!editorEl.value.trim()) {
-  // Trigger initial compile after a brief delay to ensure WASM loads smoothly
-  setTimeout(() => compileAndRender(defaultScad), 500);
-}
+(async function init() {
+  if (window.location.hash && window.location.hash.length > 1) {
+    try {
+      const hash = window.location.hash.substring(1);
+      const decoded = await decodeCode(hash);
+      if (decoded) {
+        editorEl.value = decoded;
+      }
+    } catch (e) {
+      console.error("Failed to decode SCAD from URL hash", e);
+    }
+  }
+
+  if (!editorEl.value.trim()) {
+    // Trigger initial compile after a brief delay to ensure WASM loads smoothly
+    setTimeout(() => compileAndRender(defaultScad), 500);
+  } else {
+    setTimeout(() => compileAndRender(editorEl.value), 500);
+  }
+})();

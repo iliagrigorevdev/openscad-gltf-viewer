@@ -13,6 +13,7 @@ A modern, web-based editor and 3D viewer for OpenSCAD. It natively compiles `.sc
 - **Extended PBR Support**: Visualize advanced material properties extending standard OpenSCAD, including `metalness`, `roughness`, `transmission` (glass), `clearcoat`, `sheen`, `ior`, `emissive`, `specular`, and `iridescence`.
 - **Skeletal Animations**: Fully supports parsing and playing hierarchical bone animations defined in the custom SCAD engine.
 - **Auto Smooth Geometry**: Toggle on **Auto Smooth** to automatically calculate and apply smooth vertex normals to blocky CAD geometry using a custom angle-based normal welding algorithm.
+- **Compressed URL Sharing**: Share your designs instantly without a database. The app uses the native `CompressionStream` API to deflate your SCAD code and embed it into the URL hash, making even complex models shareable via a single link.
 - **Drag-and-Drop Support**: Instantly load existing scripts by dragging and dropping any `.scad` file directly into the browser window.
 - **AI Prompt Generator**: Because LLMs don't know about this engine's custom syntax, the viewer includes a built-in tool to generate AI-ready prompts. Customise the required PBR/Animation rules, describe your object, copy the prompt, and paste it into Gemini or Claude to get perfectly compatible SCAD code!
 - **Instant Export & Image Capture**: Download your `.scad` source code, export the resulting standard `.glb` or `.gltf` file (which automatically bakes in your smoothed geometry and animations), or instantly save a `.png` screenshot of your current render viewport.
@@ -34,6 +35,7 @@ A modern, web-based editor and 3D viewer for OpenSCAD. It natively compiles `.sc
 - Toggle **Binary GLTF** to switch the WebAssembly compilation and export format between a binary `.glb` file (checked) and a plain text JSON `.gltf` file (unchecked).
 - You can manually trigger a render using the **▶ Render** button.
 - Use **⬇ SCAD** or **⬇ GLTF** to download your work. _(Note: The GLTF export respects the "Binary GLTF" toggle. Additionally, if "Auto Smooth" is enabled, the `.glb`/`.gltf` export will preserve the computed smooth vertex normals!)_
+- Click **🔗 Share** to generate a permanent link to your current script. On mobile devices, this opens the native share sheet; on desktop, it copies the link to your clipboard. Since the data is stored in the URL hash, your code is never sent to a server.
 - Use **📷 Image** to capture and download a high-quality `.png` screenshot of the 3D viewport.
 
 ### 3. Viewer Controls
@@ -60,6 +62,7 @@ npm run dev
 - **Core Compiler**: Custom OpenSCAD Emscripten port [`openscad-gltf-wasm`](https://github.com/iliagrigorevdev/openscad-gltf-wasm)
 - **3D Engine**: [Three.js](https://threejs.org/)
 - **Path Tracing**: [three-gpu-pathtracer](https://github.com/gkjohnson/three-gpu-pathtracer)
+- **Compression**: Native browser `CompressionStream` (deflate-raw) for URL state management.
 
 ## 📄 Custom SCAD Syntax Overview
 
