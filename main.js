@@ -22,6 +22,7 @@ const captureImageBtn = document.getElementById("capture-image-btn");
 const shareBtn = document.getElementById("share-btn");
 const autoRenderCb = document.getElementById("auto-render-cb");
 const autoSmoothCb = document.getElementById("auto-smooth-cb");
+const creaseAngleIn = document.getElementById("crease-angle-in");
 const pathTracingCb = document.getElementById("path-tracing-cb");
 const exportBinaryCb = document.getElementById("export-binary-cb");
 const statusEl = document.getElementById("status");
@@ -43,7 +44,14 @@ pathTracingCb.addEventListener("change", () => {
 
 // Force a re-compile if Auto Smooth changes
 autoSmoothCb.addEventListener("change", () => {
+  creaseAngleIn.disabled = !autoSmoothCb.checked;
   compileAndRender(editorEl.value || defaultScad);
+});
+
+creaseAngleIn.addEventListener("change", () => {
+  if (autoSmoothCb.checked) {
+    compileAndRender(editorEl.value || defaultScad);
+  }
 });
 
 // --- Prompt Logic ---
@@ -88,12 +96,15 @@ async function compileAndRender(scadCode) {
   try {
     const isBinary = exportBinaryCb.checked;
 
+    let creaseDeg = parseFloat(creaseAngleIn.value);
+    if (isNaN(creaseDeg)) creaseDeg = 30;
+
     // Call the newly created Bridge library
     currentGltfData = await processScad(scadCode, {
       wasmUrl: wasmUrl,
       binary: isBinary,
-      autoSmooth: autoSmoothCb.checked, // Falls back to default Math.PI/6 internally
-      creaseAngle: Math.PI / 6,
+      autoSmooth: autoSmoothCb.checked,
+      creaseAngle: creaseDeg,
     });
 
     statusEl.innerText = "Building Scene...";
