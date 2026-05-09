@@ -4,6 +4,7 @@ import { processScad } from "openscad-gltf-bridge";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js";
 import { WebGLPathTracer } from "three-gpu-pathtracer";
 import { HDRLoader } from "three/examples/jsm/loaders/HDRLoader.js";
 
@@ -25,6 +26,7 @@ const autoSmoothCb = document.getElementById("auto-smooth-cb");
 const creaseAngleIn = document.getElementById("crease-angle-in");
 const pathTracingCb = document.getElementById("path-tracing-cb");
 const exportBinaryCb = document.getElementById("export-binary-cb");
+const exportCompressionCb = document.getElementById("export-compression-cb");
 const statusEl = document.getElementById("status");
 const viewerEl = document.getElementById("viewer");
 
@@ -52,6 +54,17 @@ creaseAngleIn.addEventListener("change", () => {
   if (autoSmoothCb.checked) {
     compileAndRender(editorEl.value || defaultScad);
   }
+});
+
+exportCompressionCb.addEventListener("change", () => {
+  if (exportCompressionCb.checked) {
+    // Compressed exports must be packed as binary GLB files
+    exportBinaryCb.checked = true;
+    exportBinaryCb.disabled = true;
+  } else {
+    exportBinaryCb.disabled = false;
+  }
+  if (autoRenderCb.checked) compileAndRender(editorEl.value || defaultScad);
 });
 
 // --- Prompt Logic ---
@@ -95,6 +108,7 @@ async function compileAndRender(scadCode) {
 
   try {
     const isBinary = exportBinaryCb.checked;
+    const isCompressed = exportCompressionCb.checked;
 
     let creaseDeg = parseFloat(creaseAngleIn.value);
     if (isNaN(creaseDeg)) creaseDeg = 30;
@@ -105,6 +119,7 @@ async function compileAndRender(scadCode) {
       binary: isBinary,
       autoSmooth: autoSmoothCb.checked,
       creaseAngle: creaseDeg,
+      compression: isCompressed,
     });
 
     statusEl.innerText = "Building Scene...";
@@ -437,6 +452,8 @@ function rebuildSceneFromGLTF(gltfData) {
     }
 
     const loader = new GLTFLoader();
+    // Allow decoding meshopt buffers exported by our gltf-transform implementation
+    loader.setMeshoptDecoder(MeshoptDecoder);
 
     // Parse the data directly
     let parseData = gltfData;
@@ -447,7 +464,6 @@ function rebuildSceneFromGLTF(gltfData) {
         gltfData.byteOffset + gltfData.byteLength,
       );
     }
-    // Note: If gltfData is a JSON string, GLTFLoader handles it automatically.
 
     loader.parse(
       parseData,
