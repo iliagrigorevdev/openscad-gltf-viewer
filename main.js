@@ -1,12 +1,11 @@
-import { convertScadToGltf } from "openscad-gltf-wasm/convert";
 import { generatePrompt } from "openscad-gltf-wasm/prompt";
 import wasmUrl from "openscad-gltf-wasm/openscad.wasm?url";
+import { processScad } from "openscad-gltf-bridge";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { WebGLPathTracer } from "three-gpu-pathtracer";
 import { HDRLoader } from "three/examples/jsm/loaders/HDRLoader.js";
-import { GLTFExporter } from "three/examples/jsm/exporters/GLTFExporter.js";
 
 // Import the default script from file as raw text (Vite feature)
 import defaultScad from "./default.scad?raw";
@@ -38,31 +37,18 @@ let captureNextFrame = false;
 
 pathTracingCb.addEventListener("change", () => {
   if (pathTracingCb.checked && pathTracer) {
-    // Rebuild the BVH and refresh the scene graph to match the current animation frame
     pathTracer.setScene(scene, camera);
   }
 });
 
+// Force a re-compile if Auto Smooth changes
 autoSmoothCb.addEventListener("change", () => {
-  if (currentGltfData) {
-    statusEl.innerText = "Building BVH & Scene...";
-    // setTimeout defers the thread block allowing the UI to repaint the status first
-    setTimeout(async () => {
-      try {
-        await rebuildSceneFromGLTF(currentGltfData);
-        statusEl.innerText = "Rendering";
-      } catch (e) {
-        console.error(e);
-        statusEl.innerText = "Error Rendering";
-      }
-    }, 10);
-  }
+  compileAndRender(editorEl.value || defaultScad);
 });
 
 // --- Prompt Logic ---
 copyPromptBtn.onclick = async () => {
   const desc = promptDescEl.value.trim() || "an object";
-
   const options = {
     basic: document.getElementById("opt-pbr-basic").checked,
     transmission: document.getElementById("opt-pbr-transmission").checked,
@@ -74,7 +60,6 @@ copyPromptBtn.onclick = async () => {
     animation: document.getElementById("opt-anim").checked,
   };
 
-  // Generated using the new JavaScript module export
   const promptText = generatePrompt(desc, options);
 
   try {
@@ -98,15 +83,20 @@ async function compileAndRender(scadCode) {
   }
 
   isCompiling = true;
-  statusEl.innerText = "Compiling WASM...";
+  statusEl.innerText = "Compiling & Processing...";
 
   try {
     const isBinary = exportBinaryCb.checked;
-    currentGltfData = await convertScadToGltf(scadCode, {
+
+    // Call the newly created Bridge library
+    currentGltfData = await processScad(scadCode, {
       wasmUrl: wasmUrl,
       binary: isBinary,
+      autoSmooth: autoSmoothCb.checked, // Falls back to default Math.PI/6 internally
+      creaseAngle: Math.PI / 6,
     });
-    statusEl.innerText = "Building BVH & Scene...";
+
+    statusEl.innerText = "Building Scene...";
     await rebuildSceneFromGLTF(currentGltfData);
     statusEl.innerText = "Rendering";
   } catch (e) {
@@ -122,10 +112,8 @@ async function compileAndRender(scadCode) {
   }
 }
 
-// Fallback to the defaultScad if the editor is empty
 renderBtn.onclick = () => compileAndRender(editorEl.value || defaultScad);
 
-// Editor Auto-Render Debounce
 let renderTimeout;
 editorEl.addEventListener("input", (e) => {
   clearTimeout(renderTimeout);
@@ -135,21 +123,16 @@ editorEl.addEventListener("input", (e) => {
   }
   statusEl.innerText = "Waiting to compile...";
   renderTimeout = setTimeout(() => {
-    // Fallback to the defaultScad if the user clears the editor
     compileAndRender(e.target.value || defaultScad);
   }, 800);
 });
 
 autoRenderCb.addEventListener("change", () => {
-  if (autoRenderCb.checked) {
-    compileAndRender(editorEl.value || defaultScad);
-  }
+  if (autoRenderCb.checked) compileAndRender(editorEl.value || defaultScad);
 });
 
 exportBinaryCb.addEventListener("change", () => {
-  if (autoRenderCb.checked) {
-    compileAndRender(editorEl.value || defaultScad);
-  }
+  if (autoRenderCb.checked) compileAndRender(editorEl.value || defaultScad);
 });
 
 loadScadBtn.onclick = () => {
@@ -158,13 +141,11 @@ loadScadBtn.onclick = () => {
   input.accept = ".scad";
   input.onchange = async (e) => {
     if (e.target.files && e.target.files.length > 0) {
-      const file = e.target.files[0];
       try {
-        const text = await file.text();
+        const text = await e.target.files[0].text();
         editorEl.value = text;
         compileAndRender(text);
       } catch (err) {
-        console.error("Failed to read file", err);
         alert("Failed to read file: " + err.message);
       }
     }
@@ -178,42 +159,11 @@ downloadScadBtn.onclick = () => {
 };
 
 exportGltfBtn.onclick = () => {
+  if (!currentGltfData) return;
   const isBinary = exportBinaryCb.checked;
-
-  if (!autoSmoothCb.checked && currentGltfData) {
-    const ext = isBinary ? "glb" : "gltf";
-    const type = isBinary ? "application/octet-stream" : "text/plain";
-    downloadBlob(new Blob([currentGltfData], { type }), `model.${ext}`);
-    return;
-  }
-
-  if (currentMesh) {
-    const exporter = new GLTFExporter();
-    const options = { binary: isBinary };
-    if (currentAnimations && currentAnimations.length > 0) {
-      options.animations = currentAnimations;
-    }
-    exporter.parse(
-      currentMesh,
-      (gltf) => {
-        if (isBinary) {
-          downloadBlob(
-            new Blob([gltf], { type: "application/octet-stream" }),
-            "model.glb",
-          );
-        } else {
-          downloadBlob(
-            new Blob([JSON.stringify(gltf, null, 2)], { type: "text/plain" }),
-            "model.gltf",
-          );
-        }
-      },
-      (error) => {
-        console.error("An error happened during GLTF export:", error);
-      },
-      options,
-    );
-  }
+  const ext = isBinary ? "glb" : "gltf";
+  const type = isBinary ? "application/octet-stream" : "text/plain";
+  downloadBlob(new Blob([currentGltfData], { type }), `model.${ext}`);
 };
 
 captureImageBtn.onclick = () => {
@@ -221,6 +171,7 @@ captureImageBtn.onclick = () => {
 };
 
 // --- Share Logic ---
+// (Unchanged Base64/Zlib share logic)
 function padBase64(str) {
   const mod = str.length % 4;
   if (mod === 2) return str + "==";
@@ -237,16 +188,15 @@ async function encodeCode(code) {
       const buffer = await new Response(stream).arrayBuffer();
       const bytes = new Uint8Array(buffer);
       let binary = "";
-      for (let i = 0; i < bytes.length; i++) {
+      for (let i = 0; i < bytes.length; i++)
         binary += String.fromCharCode(bytes[i]);
-      }
       return (
         "c" +
         btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")
       );
     }
   } catch (e) {
-    console.warn("CompressionStream failed, falling back to uncompressed", e);
+    console.warn("CompressionStream failed, falling back", e);
   }
   return (
     "u" +
@@ -265,9 +215,7 @@ async function decodeCode(hash) {
   if (type === "c") {
     const binary = atob(data);
     const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) {
-      bytes[i] = binary.charCodeAt(i);
-    }
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
     const stream = new Blob([bytes])
       .stream()
       .pipeThrough(new DecompressionStream("deflate-raw"));
@@ -276,7 +224,6 @@ async function decodeCode(hash) {
   } else if (type === "u") {
     return decodeURIComponent(escape(atob(data)));
   } else {
-    // legacy / fallback
     try {
       return decodeURIComponent(
         escape(atob(padBase64(hash.replace(/-/g, "+").replace(/_/g, "/")))),
@@ -292,58 +239,41 @@ shareBtn.onclick = async () => {
   const url = new URL(window.location.href);
   let finalUrl = "";
 
-  // If content is empty or perfectly matches the default script, share the clean base URL
   if (!code || code === defaultScad.trim()) {
-    // origin + pathname + search safely constructs the URL without any #hash
     finalUrl = url.origin + url.pathname + url.search;
   } else {
     try {
-      // Encode the un-trimmed value to preserve formatting
       const hash = await encodeCode(editorEl.value);
       url.hash = hash;
       finalUrl = url.toString();
     } catch (err) {
-      console.warn("Encoding failed, falling back to base URL.", err);
       finalUrl = url.origin + url.pathname + url.search;
     }
   }
 
-  // Update the URL in the browser without reloading
   window.history.replaceState(null, "", finalUrl);
 
   try {
     if (navigator.share) {
       await navigator.share({
         title: "OpenSCAD GLTF Viewer",
-        text: "Check out this 3D model in the OpenSCAD GLTF Viewer!",
         url: finalUrl,
       });
       const originalText = shareBtn.innerText;
       shareBtn.innerText = "✅ Shared!";
-      setTimeout(() => {
-        shareBtn.innerText = originalText;
-      }, 2000);
+      setTimeout(() => (shareBtn.innerText = originalText), 2000);
     } else {
-      // Fallback to clipboard if Web Share API is not supported
       await navigator.clipboard.writeText(finalUrl);
       const originalText = shareBtn.innerText;
       shareBtn.innerText = "✅ Copied Link!";
-      setTimeout(() => {
-        shareBtn.innerText = originalText;
-      }, 2000);
+      setTimeout(() => (shareBtn.innerText = originalText), 2000);
     }
   } catch (err) {
-    // Ignore errors where the user intentionally closed the share dialog
     if (err.name !== "AbortError") {
-      console.error("Share failed", err);
-      // Try fallback if native share failed for an unexpected reason
       try {
         await navigator.clipboard.writeText(finalUrl);
-        const originalText = shareBtn.innerText;
         shareBtn.innerText = "✅ Copied Link!";
-        setTimeout(() => {
-          shareBtn.innerText = originalText;
-        }, 2000);
+        setTimeout(() => (shareBtn.innerText = "🔗 Share"), 2000);
       } catch (fallbackErr) {
         alert("Failed to share or copy link.");
       }
@@ -364,17 +294,14 @@ function downloadBlob(blob, filename) {
 
 // --- Drag and Drop SCAD ---
 const dragOverlay = document.getElementById("drag-overlay");
-
 window.addEventListener("dragenter", (e) => {
   e.preventDefault();
   dragOverlay.classList.add("active");
 });
-
 window.addEventListener("dragover", (e) => {
   e.preventDefault();
   dragOverlay.classList.add("active");
 });
-
 dragOverlay.addEventListener("dragleave", (e) => {
   e.preventDefault();
   dragOverlay.classList.remove("active");
@@ -386,8 +313,6 @@ window.addEventListener("drop", async (e) => {
 
   if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
     const file = e.dataTransfer.files[0];
-
-    // Check for scad extension or text fallback
     if (
       file.name.toLowerCase().endsWith(".scad") ||
       !file.type ||
@@ -398,7 +323,6 @@ window.addEventListener("drop", async (e) => {
         editorEl.value = text;
         compileAndRender(text);
       } catch (err) {
-        console.error("Failed to read file", err);
         alert("Failed to read file: " + err.message);
       }
     } else {
@@ -437,7 +361,6 @@ controls.dampingFactor = 0.1;
 controls.maxDistance = 2000;
 controls.addEventListener("change", () => pathTracer.updateCamera());
 
-// Environment & Lights (Updated to load local HDR)
 new HDRLoader().load(
   "./aristea_wreck_puresky_2k.hdr",
   (texture) => {
@@ -477,266 +400,7 @@ floor.rotation.x = -Math.PI / 2;
 floor.receiveShadow = true;
 scene.add(floor);
 
-// Initial empty setup
 pathTracer.setScene(scene, camera);
-
-// --- Auto Smooth Logic ---
-function computeSmoothNormals(positions, creaseAngle = Math.PI / 4) {
-  const hashToVertices = new Map();
-  const vertexNormals = new Float32Array(positions.length);
-
-  for (let i = 0; i < positions.length; i += 9) {
-    const ax = positions[i],
-      ay = positions[i + 1],
-      az = positions[i + 2];
-    const bx = positions[i + 3],
-      by = positions[i + 4],
-      bz = positions[i + 5];
-    const cx = positions[i + 6],
-      cy = positions[i + 7],
-      cz = positions[i + 8];
-
-    const cbx = cx - bx,
-      cby = cy - by,
-      cbz = cz - bz;
-    const abx = ax - bx,
-      aby = ay - by,
-      abz = az - bz;
-
-    const nx = cby * abz - cbz * aby;
-    const ny = cbz * abx - cbx * abz;
-    const nz = cbx * aby - cby * abx;
-
-    let len = Math.sqrt(nx * nx + ny * ny + nz * nz);
-    if (len === 0) len = 1;
-    const normal = { x: nx / len, y: ny / len, z: nz / len };
-
-    for (let j = 0; j < 3; j++) {
-      const vIdx = i + j * 3;
-      const x = positions[vIdx];
-      const y = positions[vIdx + 1];
-      const z = positions[vIdx + 2];
-      const hash = `${Math.round(x * 1e4)}_${Math.round(y * 1e4)}_${Math.round(z * 1e4)}`;
-
-      let list = hashToVertices.get(hash);
-      if (!list) {
-        list = [];
-        hashToVertices.set(hash, list);
-      }
-      list.push({ index: vIdx, faceNormal: normal });
-    }
-  }
-
-  const cosAngle = Math.cos(creaseAngle);
-
-  for (const list of hashToVertices.values()) {
-    const adj = Array.from({ length: list.length }, () => []);
-    for (let i = 0; i < list.length; i++) {
-      for (let j = i + 1; j < list.length; j++) {
-        const dot =
-          list[i].faceNormal.x * list[j].faceNormal.x +
-          list[i].faceNormal.y * list[j].faceNormal.y +
-          list[i].faceNormal.z * list[j].faceNormal.z;
-        if (dot >= cosAngle - 0.0001) {
-          adj[i].push(j);
-          adj[j].push(i);
-        }
-      }
-    }
-
-    const visited = new Array(list.length).fill(false);
-    for (let i = 0; i < list.length; i++) {
-      if (!visited[i]) {
-        const component = [];
-        const q = [i];
-        visited[i] = true;
-        while (q.length > 0) {
-          const curr = q.shift();
-          component.push(curr);
-          for (const neighbor of adj[curr]) {
-            if (!visited[neighbor]) {
-              visited[neighbor] = true;
-              q.push(neighbor);
-            }
-          }
-        }
-
-        let nx = 0,
-          ny = 0,
-          nz = 0;
-        for (const idx of component) {
-          nx += list[idx].faceNormal.x;
-          ny += list[idx].faceNormal.y;
-          nz += list[idx].faceNormal.z;
-        }
-        let len = Math.sqrt(nx * nx + ny * ny + nz * nz);
-        if (len === 0) len = 1;
-
-        nx /= len;
-        ny /= len;
-        nz /= len;
-
-        for (const idx of component) {
-          const v = list[idx];
-          vertexNormals[v.index] = nx;
-          vertexNormals[v.index + 1] = ny;
-          vertexNormals[v.index + 2] = nz;
-        }
-      }
-    }
-  }
-
-  return vertexNormals;
-}
-
-function autoSmoothGeometry(geometry) {
-  const nonIndexed = geometry.index
-    ? geometry.toNonIndexed()
-    : geometry.clone();
-  const positions = nonIndexed.attributes.position.array;
-
-  const hasColor = nonIndexed.attributes.color !== undefined;
-  const colors = hasColor ? nonIndexed.attributes.color.array : null;
-
-  const hasSkinIndex = nonIndexed.attributes.skinIndex !== undefined;
-  const skinIndices = hasSkinIndex
-    ? nonIndexed.attributes.skinIndex.array
-    : null;
-
-  const hasSkinWeight = nonIndexed.attributes.skinWeight !== undefined;
-  const skinWeights = hasSkinWeight
-    ? nonIndexed.attributes.skinWeight.array
-    : null;
-
-  const normals = computeSmoothNormals(positions, Math.PI / 6);
-
-  const weldedPositions = [];
-  const weldedColors = [];
-  const weldedNormals = [];
-  const weldedSkinIndices = [];
-  const weldedSkinWeights = [];
-  const indices = [];
-  const vertexHash = new Map();
-  let nextVertexIndex = 0;
-
-  for (let i = 0; i < positions.length / 3; i++) {
-    const px = positions[i * 3];
-    const py = positions[i * 3 + 1];
-    const pz = positions[i * 3 + 2];
-
-    const nx = normals[i * 3];
-    const ny = normals[i * 3 + 1];
-    const nz = normals[i * 3 + 2];
-
-    let r = 0,
-      g = 0,
-      b = 0;
-    if (hasColor) {
-      r = colors[i * 3];
-      g = colors[i * 3 + 1];
-      b = colors[i * 3 + 2];
-    }
-
-    let si0 = 0,
-      si1 = 0,
-      si2 = 0,
-      si3 = 0;
-    if (hasSkinIndex) {
-      si0 = skinIndices[i * 4];
-      si1 = skinIndices[i * 4 + 1];
-      si2 = skinIndices[i * 4 + 2];
-      si3 = skinIndices[i * 4 + 3];
-    }
-
-    let sw0 = 0,
-      sw1 = 0,
-      sw2 = 0,
-      sw3 = 0;
-    if (hasSkinWeight) {
-      sw0 = skinWeights[i * 4];
-      sw1 = skinWeights[i * 4 + 1];
-      sw2 = skinWeights[i * 4 + 2];
-      sw3 = skinWeights[i * 4 + 3];
-    }
-
-    const hx = Math.round(px * 1e4);
-    const hy = Math.round(py * 1e4);
-    const hz = Math.round(pz * 1e4);
-    const hnx = Math.round(nx * 1e4);
-    const hny = Math.round(ny * 1e4);
-    const hnz = Math.round(nz * 1e4);
-
-    let hash = `${hx}_${hy}_${hz}_${hnx}_${hny}_${hnz}`;
-    if (hasColor) {
-      const hr = Math.round(r * 1e4);
-      const hg = Math.round(g * 1e4);
-      const hb = Math.round(b * 1e4);
-      hash += `_${hr}_${hg}_${hb}`;
-    }
-    if (hasSkinIndex) {
-      hash += `_${si0}_${si1}_${si2}_${si3}`;
-    }
-    if (hasSkinWeight) {
-      const hw0 = Math.round(sw0 * 1e3);
-      const hw1 = Math.round(sw1 * 1e3);
-      const hw2 = Math.round(sw2 * 1e3);
-      const hw3 = Math.round(sw3 * 1e3);
-      hash += `_${hw0}_${hw1}_${hw2}_${hw3}`;
-    }
-
-    let idx = vertexHash.get(hash);
-    if (idx === undefined) {
-      idx = nextVertexIndex++;
-      vertexHash.set(hash, idx);
-      weldedPositions.push(px, py, pz);
-      if (hasColor) weldedColors.push(r, g, b);
-      weldedNormals.push(nx, ny, nz);
-      if (hasSkinIndex) weldedSkinIndices.push(si0, si1, si2, si3);
-      if (hasSkinWeight) weldedSkinWeights.push(sw0, sw1, sw2, sw3);
-    }
-    indices.push(idx);
-  }
-
-  const newGeometry = new THREE.BufferGeometry();
-  newGeometry.setAttribute(
-    "position",
-    new THREE.Float32BufferAttribute(weldedPositions, 3),
-  );
-  if (hasColor) {
-    newGeometry.setAttribute(
-      "color",
-      new THREE.Float32BufferAttribute(weldedColors, 3),
-    );
-  }
-  newGeometry.setAttribute(
-    "normal",
-    new THREE.Float32BufferAttribute(weldedNormals, 3),
-  );
-  if (hasSkinIndex) {
-    newGeometry.setAttribute(
-      "skinIndex",
-      new THREE.Uint16BufferAttribute(weldedSkinIndices, 4),
-    );
-  }
-  if (hasSkinWeight) {
-    newGeometry.setAttribute(
-      "skinWeight",
-      new THREE.Float32BufferAttribute(weldedSkinWeights, 4),
-    );
-  }
-
-  newGeometry.setIndex(indices);
-
-  if (nonIndexed.groups && nonIndexed.groups.length > 0) {
-    for (const g of nonIndexed.groups) {
-      newGeometry.addGroup(g.start, g.count, g.materialIndex);
-    }
-  }
-
-  nonIndexed.dispose();
-
-  return newGeometry;
-}
 
 // --- GLTF Parsing & Rendering Logic ---
 function rebuildSceneFromGLTF(gltfData) {
@@ -762,13 +426,20 @@ function rebuildSceneFromGLTF(gltfData) {
     }
 
     const loader = new GLTFLoader();
-    const arrayBuffer = gltfData.buffer.slice(
-      gltfData.byteOffset,
-      gltfData.byteOffset + gltfData.byteLength,
-    );
+
+    // Parse the data directly
+    let parseData = gltfData;
+    if (gltfData instanceof Uint8Array) {
+      // Convert Uint8Array to ArrayBuffer for the binary loader
+      parseData = gltfData.buffer.slice(
+        gltfData.byteOffset,
+        gltfData.byteOffset + gltfData.byteLength,
+      );
+    }
+    // Note: If gltfData is a JSON string, GLTFLoader handles it automatically.
 
     loader.parse(
-      arrayBuffer,
+      parseData,
       "",
       (gltf) => {
         currentMesh = gltf.scene;
@@ -776,59 +447,31 @@ function rebuildSceneFromGLTF(gltfData) {
 
         if (currentAnimations.length) {
           mixer = new THREE.AnimationMixer(currentMesh);
-
           if (currentAnimations.length === 1) {
-            // --- SINGLE ANIMATION MODE ---
-            // Play the only animation on a loop (default behavior)
             mixer.clipAction(currentAnimations[0]).play();
           } else {
-            // --- MULTI-ANIMATION SEQUENTIAL MODE ---
             let currentAnimIndex = 0;
-
             const playAnimationSequence = (index) => {
               const clip = currentAnimations[index];
               const action = mixer.clipAction(clip);
-
               action.reset();
-              // Play once so it triggers the 'finished' event
               action.setLoop(THREE.LoopOnce);
               action.clampWhenFinished = true;
               action.play();
-
               if (statusEl) statusEl.innerText = `Playing: ${clip.name}`;
             };
-
-            // Listen for the end of the current clip to trigger the next
             mixer.addEventListener("finished", () => {
               currentAnimIndex =
                 (currentAnimIndex + 1) % currentAnimations.length;
               playAnimationSequence(currentAnimIndex);
             });
-
-            // Start the first animation in the list
             playAnimationSequence(currentAnimIndex);
           }
         }
 
+        // The bridge handled the smoothing. We only set up shadows.
         currentMesh.traverse((child) => {
           if (child.isMesh) {
-            if (autoSmoothCb.checked && child.geometry) {
-              const oldGeom = child.geometry;
-              child.geometry = autoSmoothGeometry(oldGeom);
-              oldGeom.dispose();
-
-              if (child.material) {
-                const makeSmooth = (m) => {
-                  m.flatShading = false;
-                  m.needsUpdate = true;
-                };
-                if (Array.isArray(child.material)) {
-                  child.material.forEach(makeSmooth);
-                } else {
-                  makeSmooth(child.material);
-                }
-              }
-            }
             child.castShadow = true;
             child.receiveShadow = true;
           }
@@ -852,7 +495,6 @@ function fitCamera() {
   const size = worldBox.getSize(new THREE.Vector3());
   const maxDim = Math.max(size.x, size.y, size.z) || 10;
 
-  // Drop the floor slightly below the object bounds to prevent Z-fighting
   floor.position.y = worldBox.min.y - 0.01;
 
   const fov = camera.fov * (Math.PI / 180);
@@ -870,7 +512,6 @@ function fitCamera() {
   controls.target.copy(center);
   controls.update();
 
-  // Adjust directional light to cover the object dynamically
   dirLight.position.set(
     center.x + maxDim,
     center.y + maxDim * 1.5,
@@ -888,7 +529,6 @@ function fitCamera() {
   dirLight.shadow.camera.far = maxDim * 5;
   dirLight.shadow.camera.updateProjectionMatrix();
 
-  // Send the updated geometry scene to the GPU path tracer (generates BVH and resets accumulation)
   lightGroup.visible = !pathTracingCb.checked;
   pathTracer.setScene(scene, camera);
 }
@@ -901,7 +541,6 @@ function animate() {
   const delta = (now - lastTime) / 1000;
   lastTime = now;
 
-  // Pause animation while path tracing to correctly accumulate over the frozen geometry
   if (mixer && !pathTracingCb.checked) mixer.update(delta);
   controls.update();
 
@@ -913,10 +552,8 @@ function animate() {
     renderer.render(scene, camera);
   }
 
-  // Capture frame buffer immediately after rendering
   if (captureNextFrame) {
     captureNextFrame = false;
-    // Using toBlob is more efficient for high-res images than toDataURL
     renderer.domElement.toBlob((blob) => {
       if (blob) downloadBlob(blob, "render.png");
     }, "image/png");
@@ -924,7 +561,6 @@ function animate() {
 }
 animate();
 
-// Resize handler
 window.addEventListener("resize", () => {
   if (!viewerEl) return;
   const w = viewerEl.clientWidth;
@@ -936,8 +572,6 @@ window.addEventListener("resize", () => {
 });
 setTimeout(() => window.dispatchEvent(new Event("resize")), 100);
 
-// --- Initialization ---
-// Display the script as a hint, leaving the text field functionally empty
 editorEl.placeholder = defaultScad;
 
 (async function init() {
@@ -954,7 +588,6 @@ editorEl.placeholder = defaultScad;
   }
 
   if (!editorEl.value.trim()) {
-    // Trigger initial compile after a brief delay to ensure WASM loads smoothly
     setTimeout(() => compileAndRender(defaultScad), 500);
   } else {
     setTimeout(() => compileAndRender(editorEl.value), 500);

@@ -9,7 +9,7 @@
     "format": "prettier --write ."
   },
   "dependencies": {
-    "openscad-gltf-wasm": "github:iliagrigorevdev/openscad-gltf-wasm",
+    "openscad-gltf-bridge": "github:iliagrigorevdev/openscad-gltf-bridge",
     "three": "^0.184.0",
     "three-gpu-pathtracer": "^0.0.24"
   },
