@@ -61,8 +61,13 @@ exportCompressionCb.addEventListener("change", () => {
     // Compressed exports must be packed as binary GLB files
     exportBinaryCb.checked = true;
     exportBinaryCb.disabled = true;
+
+    // Disable path tracing when compressed
+    pathTracingCb.checked = false;
+    pathTracingCb.disabled = true;
   } else {
     exportBinaryCb.disabled = false;
+    pathTracingCb.disabled = false;
   }
   if (autoRenderCb.checked) compileAndRender(editorEl.value || defaultScad);
 });
