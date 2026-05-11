@@ -220,7 +220,6 @@ captureImageBtn.onclick = () => {
 };
 
 // --- Share Logic ---
-// (Unchanged Base64/Zlib share logic)
 function padBase64(str) {
   const mod = str.length % 4;
   if (mod === 2) return str + "==";
@@ -466,13 +465,32 @@ function getBackendOptions() {
   return opts;
 }
 
+// Helper to grab and clean up names from the inputs
+function getSanitizedNames() {
+  let input = backendInputEl.value.trim();
+  if (input)
+    input = input
+      .replace(/\.scad$/i, "")
+      .split(/[/\\]/)
+      .pop();
+
+  let output = backendOutputEl.value.trim();
+  if (output)
+    output = output
+      .replace(/\.(glb|gltf)$/i, "")
+      .split(/[/\\]/)
+      .pop();
+
+  return { input, output };
+}
+
 backendSaveBtn.onclick = async () => {
-  const input = backendInputEl.value.trim();
-  if (!input) return alert("Input path is required.");
+  const { input, output } = getSanitizedNames();
+  if (!input) return alert("Input name is required.");
 
   const payload = {
     input,
-    output: backendOutputEl.value.trim() || undefined,
+    output: output || "",
     options: getBackendOptions(),
     content: editorEl.value || defaultScad,
   };
@@ -505,12 +523,12 @@ backendSaveBtn.onclick = async () => {
 };
 
 backendUpdateBtn.onclick = async () => {
-  const input = backendInputEl.value.trim();
-  if (!input) return alert("Input path is required.");
+  const { input, output } = getSanitizedNames();
+  if (!input) return alert("Input name is required.");
 
   const payload = {
     input,
-    output: backendOutputEl.value.trim() || undefined,
+    output: output || "",
     options: getBackendOptions(),
   };
 
@@ -542,8 +560,8 @@ backendUpdateBtn.onclick = async () => {
 };
 
 backendLoadBtn.onclick = async () => {
-  const input = backendInputEl.value.trim();
-  if (!input) return alert("Input path is required to load a model.");
+  const { input } = getSanitizedNames();
+  if (!input) return alert("Input name is required to load a model.");
 
   try {
     backendLoadBtn.innerText = "Loading...";
