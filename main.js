@@ -46,6 +46,7 @@ const backendResizeIn = document.getElementById("backend-resize-in");
 
 const backendSaveBtn = document.getElementById("backend-save-btn");
 const backendUpdateBtn = document.getElementById("backend-update-btn");
+const backendLoadBtn = document.getElementById("backend-load-btn");
 
 let currentMesh = null;
 let currentGltfData = null;
@@ -536,6 +537,29 @@ backendUpdateBtn.onclick = async () => {
     alert("Config Updated & Build Triggered!");
   } catch (err) {
     backendUpdateBtn.innerText = "Update Config Only";
+    alert("Error: " + err.message);
+  }
+};
+
+backendLoadBtn.onclick = async () => {
+  const input = backendInputEl.value.trim();
+  if (!input) return alert("Input path is required to load a model.");
+
+  try {
+    backendLoadBtn.innerText = "Loading...";
+    const res = await fetch(
+      `${currentBackendUrl}/api/models?input=${encodeURIComponent(input)}`,
+    );
+    if (!res.ok) {
+      const errData = await res.json();
+      throw new Error(errData.error || "Failed to load model");
+    }
+    const data = await res.json();
+    editorEl.value = data.content;
+    backendLoadBtn.innerText = "Load SCAD";
+    compileAndRender(data.content);
+  } catch (err) {
+    backendLoadBtn.innerText = "Load SCAD";
     alert("Error: " + err.message);
   }
 };

@@ -201,7 +201,8 @@ button.primary:hover {
 }
 
 #backend-save-btn,
-#backend-update-btn {
+#backend-update-btn,
+#backend-load-btn {
   flex: 1;
 }
 
