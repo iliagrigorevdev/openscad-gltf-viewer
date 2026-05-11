@@ -27,6 +27,7 @@ const creaseAngleIn = document.getElementById("crease-angle-in");
 const pathTracingCb = document.getElementById("path-tracing-cb");
 const exportBinaryCb = document.getElementById("export-binary-cb");
 const exportCompressionCb = document.getElementById("export-compression-cb");
+const resizeIn = document.getElementById("resize-in");
 const statusEl = document.getElementById("status");
 const viewerEl = document.getElementById("viewer");
 
@@ -36,13 +37,6 @@ const backendUiEl = document.getElementById("backend-ui");
 const backendSelectEl = document.getElementById("backend-select");
 const backendInputEl = document.getElementById("backend-input");
 const backendOutputEl = document.getElementById("backend-output");
-
-// Config Parameter elements
-const backendBinaryCb = document.getElementById("backend-binary-cb");
-const backendSmoothCb = document.getElementById("backend-smooth-cb");
-const backendCreaseIn = document.getElementById("backend-crease-in");
-const backendCompressCb = document.getElementById("backend-compress-cb");
-const backendResizeIn = document.getElementById("backend-resize-in");
 
 const backendSaveBtn = document.getElementById("backend-save-btn");
 const backendUpdateBtn = document.getElementById("backend-update-btn");
@@ -56,6 +50,22 @@ let pendingCode = null;
 let mixer = null;
 let captureNextFrame = false;
 
+function syncSmoothState() {
+  creaseAngleIn.disabled = !autoSmoothCb.checked;
+}
+
+function syncCompressionState() {
+  if (exportCompressionCb.checked) {
+    exportBinaryCb.checked = true;
+    exportBinaryCb.disabled = true;
+    pathTracingCb.checked = false;
+    pathTracingCb.disabled = true;
+  } else {
+    exportBinaryCb.disabled = false;
+    pathTracingCb.disabled = false;
+  }
+}
+
 pathTracingCb.addEventListener("change", () => {
   if (pathTracingCb.checked && pathTracer) {
     pathTracer.setScene(scene, camera);
@@ -64,7 +74,7 @@ pathTracingCb.addEventListener("change", () => {
 
 // Force a re-compile if Auto Smooth changes
 autoSmoothCb.addEventListener("change", () => {
-  creaseAngleIn.disabled = !autoSmoothCb.checked;
+  syncSmoothState();
   compileAndRender(editorEl.value || defaultScad);
 });
 
@@ -75,18 +85,11 @@ creaseAngleIn.addEventListener("change", () => {
 });
 
 exportCompressionCb.addEventListener("change", () => {
-  if (exportCompressionCb.checked) {
-    // Compressed exports must be packed as binary GLB files
-    exportBinaryCb.checked = true;
-    exportBinaryCb.disabled = true;
+  syncCompressionState();
+  if (autoRenderCb.checked) compileAndRender(editorEl.value || defaultScad);
+});
 
-    // Disable path tracing when compressed
-    pathTracingCb.checked = false;
-    pathTracingCb.disabled = true;
-  } else {
-    exportBinaryCb.disabled = false;
-    pathTracingCb.disabled = false;
-  }
+resizeIn.addEventListener("change", () => {
   if (autoRenderCb.checked) compileAndRender(editorEl.value || defaultScad);
 });
 
@@ -136,14 +139,21 @@ async function compileAndRender(scadCode) {
     let creaseDeg = parseFloat(creaseAngleIn.value);
     if (isNaN(creaseDeg)) creaseDeg = 30;
 
-    // Call the newly created Bridge library
-    currentGltfData = await processScad(scadCode, {
+    const opts = {
       wasmUrl: wasmUrl,
       binary: isBinary,
       autoSmooth: autoSmoothCb.checked,
       creaseAngle: creaseDeg,
       compression: isCompressed,
-    });
+    };
+
+    let resizeVal = parseFloat(resizeIn.value);
+    if (!isNaN(resizeVal) && resizeVal > 0) {
+      opts.resize = resizeVal;
+    }
+
+    // Call the newly created Bridge library
+    currentGltfData = await processScad(scadCode, opts);
 
     statusEl.innerText = "Building Scene...";
     await rebuildSceneFromGLTF(currentGltfData);
@@ -427,11 +437,11 @@ backendSelectEl.addEventListener("change", () => {
     backendOutputEl.value = "";
 
     // Reset configuration options to default
-    backendBinaryCb.checked = true;
-    backendSmoothCb.checked = true;
-    backendCreaseIn.value = "30";
-    backendCompressCb.checked = false;
-    backendResizeIn.value = "";
+    exportBinaryCb.checked = true;
+    autoSmoothCb.checked = true;
+    creaseAngleIn.value = "30";
+    exportCompressionCb.checked = false;
+    resizeIn.value = "";
   } else {
     const asset = serverConfig.assets[idx];
     backendInputEl.value = asset.input || "";
@@ -439,25 +449,28 @@ backendSelectEl.addEventListener("change", () => {
 
     // Fill custom parameter config
     const opts = asset.options || {};
-    backendBinaryCb.checked = opts.binary !== false;
-    backendSmoothCb.checked = opts.autoSmooth !== false;
-    backendCreaseIn.value =
+    exportBinaryCb.checked = opts.binary !== false;
+    autoSmoothCb.checked = opts.autoSmooth !== false;
+    creaseAngleIn.value =
       opts.creaseAngle !== undefined ? opts.creaseAngle : 30;
-    backendCompressCb.checked = !!opts.compression;
-    backendResizeIn.value = opts.resize !== undefined ? opts.resize : "";
+    exportCompressionCb.checked = !!opts.compression;
+    resizeIn.value = opts.resize !== undefined ? opts.resize : "";
   }
+
+  syncSmoothState();
+  syncCompressionState();
 });
 
 // Bundle parameters from the new UI explicitly for scad.config.json
 function getBackendOptions() {
   const opts = {
-    binary: backendBinaryCb.checked,
-    autoSmooth: backendSmoothCb.checked,
-    creaseAngle: parseFloat(backendCreaseIn.value) || 30,
-    compression: backendCompressCb.checked,
+    binary: exportBinaryCb.checked,
+    autoSmooth: autoSmoothCb.checked,
+    creaseAngle: parseFloat(creaseAngleIn.value) || 30,
+    compression: exportCompressionCb.checked,
   };
 
-  const resizeVal = parseFloat(backendResizeIn.value);
+  const resizeVal = parseFloat(resizeIn.value);
   if (!isNaN(resizeVal) && resizeVal > 0) {
     opts.resize = resizeVal;
   }
@@ -574,6 +587,20 @@ backendLoadBtn.onclick = async () => {
     }
     const data = await res.json();
     editorEl.value = data.content;
+
+    if (data.options) {
+      exportBinaryCb.checked = data.options.binary !== false;
+      autoSmoothCb.checked = data.options.autoSmooth !== false;
+      creaseAngleIn.value =
+        data.options.creaseAngle !== undefined ? data.options.creaseAngle : 30;
+      exportCompressionCb.checked = !!data.options.compression;
+      resizeIn.value =
+        data.options.resize !== undefined ? data.options.resize : "";
+
+      syncSmoothState();
+      syncCompressionState();
+    }
+
     backendLoadBtn.innerText = "Load SCAD";
     compileAndRender(data.content);
   } catch (err) {

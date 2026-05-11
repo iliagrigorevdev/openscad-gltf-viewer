@@ -126,6 +126,17 @@
               ><input type="checkbox" id="export-compression-cb" /> Compress
               GLTF</label
             >
+            <label title="Resize (Absolute Dimension in units)"
+              >Resize:
+              <input
+                type="number"
+                id="resize-in"
+                placeholder="None"
+                min="0"
+                step="0.1"
+                style="width: 60px"
+              />
+            </label>
           </div>
         </div>
 
@@ -155,42 +166,6 @@
                 id="backend-output"
                 placeholder="Output (optional)"
               />
-            </div>
-
-            <!-- Explicit Config Parameters for scad-build -->
-            <div class="controls-row backend-row toggles">
-              <label
-                ><input type="checkbox" id="backend-binary-cb" checked />
-                Binary</label
-              >
-              <label
-                ><input type="checkbox" id="backend-smooth-cb" checked /> Auto
-                Smooth</label
-              >
-              <label title="Crease Angle"
-                ><input
-                  type="number"
-                  id="backend-crease-in"
-                  value="30"
-                  min="0"
-                  max="180"
-                />°</label
-              >
-              <label
-                ><input type="checkbox" id="backend-compress-cb" />
-                Compress</label
-              >
-              <label title="Resize (Absolute Dimension in units)"
-                >Resize:
-                <input
-                  type="number"
-                  id="backend-resize-in"
-                  placeholder="None"
-                  min="0"
-                  step="0.1"
-                  style="width: 60px"
-                />
-              </label>
             </div>
 
             <div class="controls-row">
