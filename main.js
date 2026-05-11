@@ -418,20 +418,22 @@ backendConnectBtn.onclick = async () => {
     serverConfig = await fetchBackendConfig(url);
     currentBackendUrl = url;
     backendConnectBtn.innerText = "Connected";
-    backendUiEl.style.display = "block";
+    backendUiEl.classList.add("active");
     renderBackendSelect();
   } catch (err) {
     alert("Connection failed: " + err.message);
     backendConnectBtn.innerText = "Connect";
-    backendUiEl.style.display = "none";
+    backendUiEl.classList.remove("active");
   }
 };
 
 // Update Config Parameters form when a new model is selected
 backendSelectEl.addEventListener("change", async () => {
   const idx = backendSelectEl.value;
+
   if (idx === "") {
     backendInputEl.value = "";
+    backendInputEl.style.display = "block";
 
     // Reset configuration options to default
     exportBinaryCb.checked = true;
@@ -443,6 +445,7 @@ backendSelectEl.addEventListener("change", async () => {
     const asset = serverConfig.assets[idx];
     const input = asset.input;
     backendInputEl.value = input || "";
+    backendInputEl.style.display = "none";
 
     // Fill custom parameter config
     const opts = asset.options || {};
@@ -492,9 +495,17 @@ function getBackendOptions() {
   return opts;
 }
 
-// Helper to grab and clean up names from the inputs
+// Helper to grab and clean up names from the inputs or dropdown
 function getSanitizedNames() {
-  let input = backendInputEl.value.trim();
+  let input = "";
+  const idx = backendSelectEl.value;
+
+  if (idx === "") {
+    input = backendInputEl.value.trim();
+  } else {
+    input = serverConfig.assets[idx].input;
+  }
+
   if (input)
     input = input
       .replace(/\.scad$/i, "")
@@ -531,8 +542,11 @@ backendSaveBtn.onclick = async () => {
     serverConfig = await fetchBackendConfig(currentBackendUrl);
     renderBackendSelect();
 
-    const idx = serverConfig.assets.findIndex((a) => a.input === input);
-    if (idx >= 0) backendSelectEl.value = idx;
+    const newIdx = serverConfig.assets.findIndex((a) => a.input === input);
+    if (newIdx >= 0) {
+      backendSelectEl.value = newIdx;
+      backendInputEl.style.display = "none";
+    }
 
     alert("Saved & Build Triggered!");
   } catch (err) {
