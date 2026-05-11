@@ -39,7 +39,6 @@ const backendInputEl = document.getElementById("backend-input");
 
 const backendSaveBtn = document.getElementById("backend-save-btn");
 const backendUpdateBtn = document.getElementById("backend-update-btn");
-const backendLoadBtn = document.getElementById("backend-load-btn");
 
 let currentMesh = null;
 let currentGltfData = null;
@@ -429,7 +428,7 @@ backendConnectBtn.onclick = async () => {
 };
 
 // Update Config Parameters form when a new model is selected
-backendSelectEl.addEventListener("change", () => {
+backendSelectEl.addEventListener("change", async () => {
   const idx = backendSelectEl.value;
   if (idx === "") {
     backendInputEl.value = "";
@@ -442,7 +441,8 @@ backendSelectEl.addEventListener("change", () => {
     resizeIn.value = "";
   } else {
     const asset = serverConfig.assets[idx];
-    backendInputEl.value = asset.input || "";
+    const input = asset.input;
+    backendInputEl.value = input || "";
 
     // Fill custom parameter config
     const opts = asset.options || {};
@@ -452,6 +452,23 @@ backendSelectEl.addEventListener("change", () => {
       opts.creaseAngle !== undefined ? opts.creaseAngle : 30;
     exportCompressionCb.checked = !!opts.compression;
     resizeIn.value = opts.resize !== undefined ? opts.resize : "";
+
+    // Automatically load the content
+    try {
+      statusEl.innerText = "Loading from server...";
+      const res = await fetch(
+        `${currentBackendUrl}/api/models?input=${encodeURIComponent(input)}`,
+      );
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || "Failed to load model");
+      }
+      const data = await res.json();
+      editorEl.value = data.content;
+      compileAndRender(data.content);
+    } catch (err) {
+      alert("Error loading model: " + err.message);
+    }
   }
 
   syncSmoothState();
@@ -556,43 +573,6 @@ backendUpdateBtn.onclick = async () => {
     alert("Config Updated & Build Triggered!");
   } catch (err) {
     backendUpdateBtn.innerText = "Update Config Only";
-    alert("Error: " + err.message);
-  }
-};
-
-backendLoadBtn.onclick = async () => {
-  const { input } = getSanitizedNames();
-  if (!input) return alert("Input name is required to load a model.");
-
-  try {
-    backendLoadBtn.innerText = "Loading...";
-    const res = await fetch(
-      `${currentBackendUrl}/api/models?input=${encodeURIComponent(input)}`,
-    );
-    if (!res.ok) {
-      const errData = await res.json();
-      throw new Error(errData.error || "Failed to load model");
-    }
-    const data = await res.json();
-    editorEl.value = data.content;
-
-    if (data.options) {
-      exportBinaryCb.checked = data.options.binary !== false;
-      autoSmoothCb.checked = data.options.autoSmooth !== false;
-      creaseAngleIn.value =
-        data.options.creaseAngle !== undefined ? data.options.creaseAngle : 30;
-      exportCompressionCb.checked = !!data.options.compression;
-      resizeIn.value =
-        data.options.resize !== undefined ? data.options.resize : "";
-
-      syncSmoothState();
-      syncCompressionState();
-    }
-
-    backendLoadBtn.innerText = "Load SCAD";
-    compileAndRender(data.content);
-  } catch (err) {
-    backendLoadBtn.innerText = "Load SCAD";
     alert("Error: " + err.message);
   }
 };
