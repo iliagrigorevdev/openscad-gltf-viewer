@@ -36,7 +36,6 @@ const backendConnectBtn = document.getElementById("backend-connect-btn");
 const backendUiEl = document.getElementById("backend-ui");
 const backendSelectEl = document.getElementById("backend-select");
 const backendInputEl = document.getElementById("backend-input");
-const backendOutputEl = document.getElementById("backend-output");
 
 const backendSaveBtn = document.getElementById("backend-save-btn");
 const backendUpdateBtn = document.getElementById("backend-update-btn");
@@ -434,7 +433,6 @@ backendSelectEl.addEventListener("change", () => {
   const idx = backendSelectEl.value;
   if (idx === "") {
     backendInputEl.value = "";
-    backendOutputEl.value = "";
 
     // Reset configuration options to default
     exportBinaryCb.checked = true;
@@ -445,7 +443,6 @@ backendSelectEl.addEventListener("change", () => {
   } else {
     const asset = serverConfig.assets[idx];
     backendInputEl.value = asset.input || "";
-    backendOutputEl.value = asset.output || "";
 
     // Fill custom parameter config
     const opts = asset.options || {};
@@ -487,23 +484,15 @@ function getSanitizedNames() {
       .split(/[/\\]/)
       .pop();
 
-  let output = backendOutputEl.value.trim();
-  if (output)
-    output = output
-      .replace(/\.(glb|gltf)$/i, "")
-      .split(/[/\\]/)
-      .pop();
-
-  return { input, output };
+  return { input };
 }
 
 backendSaveBtn.onclick = async () => {
-  const { input, output } = getSanitizedNames();
+  const { input } = getSanitizedNames();
   if (!input) return alert("Input name is required.");
 
   const payload = {
     input,
-    output: output || "",
     options: getBackendOptions(),
     content: editorEl.value || defaultScad,
   };
@@ -536,12 +525,11 @@ backendSaveBtn.onclick = async () => {
 };
 
 backendUpdateBtn.onclick = async () => {
-  const { input, output } = getSanitizedNames();
+  const { input } = getSanitizedNames();
   if (!input) return alert("Input name is required.");
 
   const payload = {
     input,
-    output: output || "",
     options: getBackendOptions(),
   };
 
