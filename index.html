@@ -128,6 +128,79 @@
             >
           </div>
         </div>
+
+        <div class="panel-section">
+          <h2>3. SCAD Serve Backend</h2>
+          <div class="controls-row">
+            <input
+              type="text"
+              id="backend-url"
+              value="http://localhost:3000"
+              placeholder="http://localhost:3000"
+            />
+            <button id="backend-connect-btn">Connect</button>
+          </div>
+          <div id="backend-ui">
+            <select id="backend-select">
+              <option value="">-- Create New Model --</option>
+            </select>
+            <div class="controls-row backend-row">
+              <input
+                type="text"
+                id="backend-input"
+                placeholder="Input (e.g. src/model.scad)"
+              />
+              <input
+                type="text"
+                id="backend-output"
+                placeholder="Output (optional)"
+              />
+            </div>
+
+            <!-- Explicit Config Parameters for scad-build -->
+            <div class="controls-row backend-row toggles">
+              <label
+                ><input type="checkbox" id="backend-binary-cb" checked />
+                Binary</label
+              >
+              <label
+                ><input type="checkbox" id="backend-smooth-cb" checked /> Auto
+                Smooth</label
+              >
+              <label title="Crease Angle"
+                ><input
+                  type="number"
+                  id="backend-crease-in"
+                  value="30"
+                  min="0"
+                  max="180"
+                />°</label
+              >
+              <label
+                ><input type="checkbox" id="backend-compress-cb" />
+                Compress</label
+              >
+              <label title="Resize (Absolute Dimension in units)"
+                >Resize:
+                <input
+                  type="number"
+                  id="backend-resize-in"
+                  placeholder="None"
+                  min="0"
+                  step="0.1"
+                  style="width: 60px"
+                />
+              </label>
+            </div>
+
+            <div class="controls-row">
+              <button id="backend-save-btn" class="primary">
+                Save SCAD + Config
+              </button>
+              <button id="backend-update-btn">Update Config Only</button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Right / Bottom Half: Viewer -->

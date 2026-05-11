@@ -30,6 +30,23 @@ const exportCompressionCb = document.getElementById("export-compression-cb");
 const statusEl = document.getElementById("status");
 const viewerEl = document.getElementById("viewer");
 
+const backendUrlEl = document.getElementById("backend-url");
+const backendConnectBtn = document.getElementById("backend-connect-btn");
+const backendUiEl = document.getElementById("backend-ui");
+const backendSelectEl = document.getElementById("backend-select");
+const backendInputEl = document.getElementById("backend-input");
+const backendOutputEl = document.getElementById("backend-output");
+
+// Config Parameter elements
+const backendBinaryCb = document.getElementById("backend-binary-cb");
+const backendSmoothCb = document.getElementById("backend-smooth-cb");
+const backendCreaseIn = document.getElementById("backend-crease-in");
+const backendCompressCb = document.getElementById("backend-compress-cb");
+const backendResizeIn = document.getElementById("backend-resize-in");
+
+const backendSaveBtn = document.getElementById("backend-save-btn");
+const backendUpdateBtn = document.getElementById("backend-update-btn");
+
 let currentMesh = null;
 let currentGltfData = null;
 let currentAnimations = [];
@@ -361,6 +378,167 @@ window.addEventListener("drop", async (e) => {
     }
   }
 });
+
+// --- Backend Integration ---
+let serverConfig = null;
+let currentBackendUrl = "";
+
+async function fetchBackendConfig(url) {
+  const res = await fetch(`${url}/api/config`);
+  if (!res.ok) throw new Error("Failed to fetch config");
+  return await res.json();
+}
+
+function renderBackendSelect() {
+  backendSelectEl.innerHTML =
+    '<option value="">-- Create New Model --</option>';
+  if (serverConfig && Array.isArray(serverConfig.assets)) {
+    serverConfig.assets.forEach((asset, index) => {
+      const opt = document.createElement("option");
+      opt.value = index;
+      opt.innerText = asset.input;
+      backendSelectEl.appendChild(opt);
+    });
+  }
+}
+
+backendConnectBtn.onclick = async () => {
+  const url = backendUrlEl.value.trim();
+  if (!url) return;
+  try {
+    backendConnectBtn.innerText = "Connecting...";
+    serverConfig = await fetchBackendConfig(url);
+    currentBackendUrl = url;
+    backendConnectBtn.innerText = "Connected";
+    backendUiEl.style.display = "block";
+    renderBackendSelect();
+  } catch (err) {
+    alert("Connection failed: " + err.message);
+    backendConnectBtn.innerText = "Connect";
+    backendUiEl.style.display = "none";
+  }
+};
+
+// Update Config Parameters form when a new model is selected
+backendSelectEl.addEventListener("change", () => {
+  const idx = backendSelectEl.value;
+  if (idx === "") {
+    backendInputEl.value = "";
+    backendOutputEl.value = "";
+
+    // Reset configuration options to default
+    backendBinaryCb.checked = true;
+    backendSmoothCb.checked = true;
+    backendCreaseIn.value = "30";
+    backendCompressCb.checked = false;
+    backendResizeIn.value = "";
+  } else {
+    const asset = serverConfig.assets[idx];
+    backendInputEl.value = asset.input || "";
+    backendOutputEl.value = asset.output || "";
+
+    // Fill custom parameter config
+    const opts = asset.options || {};
+    backendBinaryCb.checked = opts.binary !== false;
+    backendSmoothCb.checked = opts.autoSmooth !== false;
+    backendCreaseIn.value =
+      opts.creaseAngle !== undefined ? opts.creaseAngle : 30;
+    backendCompressCb.checked = !!opts.compression;
+    backendResizeIn.value = opts.resize !== undefined ? opts.resize : "";
+  }
+});
+
+// Bundle parameters from the new UI explicitly for scad.config.json
+function getBackendOptions() {
+  const opts = {
+    binary: backendBinaryCb.checked,
+    autoSmooth: backendSmoothCb.checked,
+    creaseAngle: parseFloat(backendCreaseIn.value) || 30,
+    compression: backendCompressCb.checked,
+  };
+
+  const resizeVal = parseFloat(backendResizeIn.value);
+  if (!isNaN(resizeVal) && resizeVal > 0) {
+    opts.resize = resizeVal;
+  }
+
+  return opts;
+}
+
+backendSaveBtn.onclick = async () => {
+  const input = backendInputEl.value.trim();
+  if (!input) return alert("Input path is required.");
+
+  const payload = {
+    input,
+    output: backendOutputEl.value.trim() || undefined,
+    options: getBackendOptions(),
+    content: editorEl.value || defaultScad,
+  };
+
+  try {
+    backendSaveBtn.innerText = "Saving...";
+    const res = await fetch(`${currentBackendUrl}/api/models`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const errData = await res.json();
+      throw new Error(errData.error || "Save failed");
+    }
+
+    backendSaveBtn.innerText = "Save SCAD + Config";
+
+    serverConfig = await fetchBackendConfig(currentBackendUrl);
+    renderBackendSelect();
+
+    const idx = serverConfig.assets.findIndex((a) => a.input === input);
+    if (idx >= 0) backendSelectEl.value = idx;
+
+    alert("Saved & Build Triggered!");
+  } catch (err) {
+    backendSaveBtn.innerText = "Save SCAD + Config";
+    alert("Error: " + err.message);
+  }
+};
+
+backendUpdateBtn.onclick = async () => {
+  const input = backendInputEl.value.trim();
+  if (!input) return alert("Input path is required.");
+
+  const payload = {
+    input,
+    output: backendOutputEl.value.trim() || undefined,
+    options: getBackendOptions(),
+  };
+
+  try {
+    backendUpdateBtn.innerText = "Updating...";
+    const res = await fetch(`${currentBackendUrl}/api/models`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const errData = await res.json();
+      throw new Error(errData.error || "Update failed");
+    }
+
+    backendUpdateBtn.innerText = "Update Config Only";
+
+    serverConfig = await fetchBackendConfig(currentBackendUrl);
+    renderBackendSelect();
+
+    const idx = serverConfig.assets.findIndex((a) => a.input === input);
+    if (idx >= 0) backendSelectEl.value = idx;
+
+    alert("Config Updated & Build Triggered!");
+  } catch (err) {
+    backendUpdateBtn.innerText = "Update Config Only";
+    alert("Error: " + err.message);
+  }
+};
 
 // --- Three.js Setup ---
 const scene = new THREE.Scene();

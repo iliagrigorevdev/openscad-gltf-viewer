@@ -92,6 +92,21 @@ textarea:focus {
   border-color: #666;
 }
 
+input[type="text"],
+select {
+  background: #2a2a2a;
+  color: #d4d4d4;
+  border: 1px solid #444;
+  border-radius: 4px;
+  padding: 8px;
+  font-size: 13px;
+  outline: none;
+}
+input[type="text"]:focus,
+select:focus {
+  border-color: #666;
+}
+
 #editor {
   flex-grow: 1;
   min-height: 150px;
@@ -163,6 +178,34 @@ button.primary:hover {
   cursor: not-allowed;
 }
 
+/* --- Backend UI Elements --- */
+#backend-url,
+#backend-input,
+#backend-output {
+  flex: 1;
+  min-width: 0;
+}
+
+#backend-ui {
+  display: none; /* Toggled by JS */
+  margin-top: 10px;
+}
+
+#backend-select {
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+#backend-ui .backend-row {
+  margin-bottom: 8px;
+}
+
+#backend-save-btn,
+#backend-update-btn {
+  flex: 1;
+}
+
+/* --- Viewer Elements --- */
 #viewer {
   width: 100%;
   height: 100%;
