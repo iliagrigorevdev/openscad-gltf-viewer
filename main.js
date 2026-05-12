@@ -103,6 +103,7 @@ copyPromptBtn.onclick = async () => {
     specular: document.getElementById("opt-pbr-specular").checked,
     iridescence: document.getElementById("opt-pbr-iridescence").checked,
     animation: document.getElementById("opt-anim").checked,
+    morph: document.getElementById("opt-morph").checked,
   };
 
   const promptText = generatePrompt(desc, options);
