@@ -24,7 +24,7 @@ const autoRenderCb = document.getElementById("auto-render-cb");
 const autoSmoothCb = document.getElementById("auto-smooth-cb");
 const creaseAngleIn = document.getElementById("crease-angle-in");
 const pathTracingCb = document.getElementById("path-tracing-cb");
-const resizeIn = document.getElementById("resize-in");
+
 const statusEl = document.getElementById("status");
 const viewerEl = document.getElementById("viewer");
 
@@ -65,10 +65,6 @@ creaseAngleIn.addEventListener("change", () => {
   if (autoSmoothCb.checked) {
     compileAndRender(editorEl.value || defaultScad);
   }
-});
-
-resizeIn.addEventListener("change", () => {
-  if (autoRenderCb.checked) compileAndRender(editorEl.value || defaultScad);
 });
 
 // --- Prompt Logic ---
@@ -120,11 +116,6 @@ async function compileAndRender(scadCode) {
       autoSmooth: autoSmoothCb.checked,
       creaseAngle: creaseDeg,
     };
-
-    let resizeVal = parseFloat(resizeIn.value);
-    if (!isNaN(resizeVal) && resizeVal > 0) {
-      opts.resize = resizeVal;
-    }
 
     // Call the newly created Bridge library
     currentGltfData = await processScad(scadCode, opts);
@@ -411,7 +402,6 @@ backendSelectEl.addEventListener("change", async () => {
 
     autoSmoothCb.checked = true;
     creaseAngleIn.value = "30";
-    resizeIn.value = "";
   } else {
     const asset = serverConfig.assets[idx];
     const input = asset.input;
@@ -424,7 +414,6 @@ backendSelectEl.addEventListener("change", async () => {
     autoSmoothCb.checked = opts.autoSmooth !== false;
     creaseAngleIn.value =
       opts.creaseAngle !== undefined ? opts.creaseAngle : 30;
-    resizeIn.value = opts.resize !== undefined ? opts.resize : "";
 
     // Automatically load the content
     try {
@@ -453,11 +442,6 @@ function getBackendOptions() {
     autoSmooth: autoSmoothCb.checked,
     creaseAngle: parseFloat(creaseAngleIn.value) || 30,
   };
-
-  const resizeVal = parseFloat(resizeIn.value);
-  if (!isNaN(resizeVal) && resizeVal > 0) {
-    opts.resize = resizeVal;
-  }
 
   return opts;
 }
