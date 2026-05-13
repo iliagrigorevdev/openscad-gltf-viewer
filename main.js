@@ -191,10 +191,10 @@ downloadScadBtn.onclick = () => {
 
 exportGltfBtn.onclick = () => {
   if (!currentGltfData) return;
-
-  const ext = isBinary ? "glb" : "gltf";
-  const type = isBinary ? "application/octet-stream" : "text/plain";
-  downloadBlob(new Blob([currentGltfData], { type }), `model.${ext}`);
+  downloadBlob(
+    new Blob([currentGltfData], { type: "application/octet-stream" }),
+    `model.glb`,
+  );
 };
 
 captureImageBtn.onclick = () => {
