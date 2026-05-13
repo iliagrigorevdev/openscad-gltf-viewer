@@ -7,7 +7,6 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { WebGLPathTracer } from "three-gpu-pathtracer";
 import { HDRLoader } from "three/examples/jsm/loaders/HDRLoader.js";
 
-// Import the default script from file as raw text (Vite feature)
 import defaultScad from "./default.scad?raw";
 
 // --- UI Elements ---
@@ -40,7 +39,19 @@ const animPlayBtn = document.getElementById("anim-play-btn");
 const animSelect = document.getElementById("anim-select");
 const animSlider = document.getElementById("anim-slider");
 
-let currentSelectedModelIdx = ""; // Track current selection for unsaved changes confirmation
+const levelEditorSection = document.getElementById("level-editor-section");
+const levelSelect = document.getElementById("level-select");
+const levelNameInput = document.getElementById("level-name-input");
+const levelCreateBtn = document.getElementById("level-create-btn");
+const levelSaveBtn = document.getElementById("level-save-btn");
+const levelDeleteBtn = document.getElementById("level-delete-btn");
+const levelObjectsContainer = document.getElementById(
+  "level-objects-container",
+);
+const addLevelObjectBtn = document.getElementById("add-level-object-btn");
+const levelObjectsList = document.getElementById("level-objects-list");
+
+let currentSelectedModelIdx = "";
 let currentMesh = null;
 let currentGltfData = null;
 let currentAnimations = [];
@@ -49,7 +60,6 @@ let pendingCode = null;
 let mixer = null;
 let captureNextFrame = false;
 
-// Track connection and state
 let isServerConnected = false;
 let currentModelOriginalState = {
   isNew: true,
@@ -57,17 +67,18 @@ let currentModelOriginalState = {
   content: "",
 };
 
-// Animation State
+// Level State
+let currentLevelIdx = "";
+let currentLevelData = null;
+let levelObjectsMeshes = {}; // Maps path string "0-1-0" to THREE.Group
+let assetCache = {}; // Caches the Parsed THREE.Scene (ready to be cloned)
+
 let currentAction = null;
 let isPlaying = true;
 let isDraggingSlider = false;
 
-// Helper to determine what to render
 function getEditorContent() {
-  if (isServerConnected) {
-    return editorEl.value; // Allow true empty state
-  }
-  // Fallback to default SCAD only when disconnected
+  if (isServerConnected) return editorEl.value;
   return editorEl.value || defaultScad;
 }
 
@@ -81,7 +92,6 @@ pathTracingCb.addEventListener("change", () => {
   }
 });
 
-// Force a re-compile if Auto Smooth changes
 autoSmoothCb.addEventListener("change", () => {
   syncSmoothState();
   checkChanges();
@@ -90,14 +100,11 @@ autoSmoothCb.addEventListener("change", () => {
 
 creaseAngleIn.addEventListener("change", () => {
   checkChanges();
-  if (autoSmoothCb.checked) {
-    compileAndRender(getEditorContent());
-  }
+  if (autoSmoothCb.checked) compileAndRender(getEditorContent());
 });
 creaseAngleIn.addEventListener("input", checkChanges);
 backendInputEl.addEventListener("input", checkChanges);
 
-// --- Prompt Logic ---
 copyPromptBtn.onclick = async () => {
   const desc = promptDescEl.value.trim() || "an object";
   const options = {
@@ -110,9 +117,7 @@ copyPromptBtn.onclick = async () => {
     iridescence: document.getElementById("opt-pbr-iridescence").checked,
     animation: document.getElementById("opt-anim").checked,
   };
-
   const promptText = generatePrompt(desc, options);
-
   try {
     await navigator.clipboard.writeText(promptText);
     const originalText = copyPromptBtn.innerText;
@@ -125,15 +130,12 @@ copyPromptBtn.onclick = async () => {
   }
 };
 
-// --- SCAD Compilation ---
 async function compileAndRender(scadCode) {
   if (typeof scadCode !== "string") return;
   if (isCompiling) {
     pendingCode = scadCode;
     return;
   }
-
-  // Handle empty models natively to clear the 3D viewer
   if (scadCode.trim() === "") {
     clearCurrentMesh();
     statusEl.innerText = "Waiting for code...";
@@ -142,7 +144,6 @@ async function compileAndRender(scadCode) {
 
   isCompiling = true;
   statusEl.innerText = "Compiling & Processing...";
-
   try {
     let creaseDeg = parseFloat(creaseAngleIn.value);
     if (isNaN(creaseDeg)) creaseDeg = 30;
@@ -152,8 +153,6 @@ async function compileAndRender(scadCode) {
       autoSmooth: autoSmoothCb.checked,
       creaseAngle: creaseDeg,
     };
-
-    // Call the newly created Bridge library
     currentGltfData = await processScad(scadCode, opts);
 
     statusEl.innerText = "Building Scene...";
@@ -172,7 +171,11 @@ async function compileAndRender(scadCode) {
   }
 }
 
-renderBtn.onclick = () => compileAndRender(getEditorContent());
+renderBtn.onclick = () => {
+  if (levelSelect && levelSelect.value !== "" && levelSelect.value !== "new")
+    return;
+  compileAndRender(getEditorContent());
+};
 
 let renderTimeout;
 editorEl.addEventListener("input", () => {
@@ -228,7 +231,6 @@ captureImageBtn.onclick = () => {
   captureNextFrame = true;
 };
 
-// --- Share Logic ---
 function padBase64(str) {
   const mod = str.length % 4;
   if (mod === 2) return str + "==";
@@ -253,7 +255,7 @@ async function encodeCode(code) {
       );
     }
   } catch (e) {
-    console.warn("CompressionStream failed, falling back", e);
+    console.warn("CompressionStream failed", e);
   }
   return (
     "u" +
@@ -268,7 +270,6 @@ async function decodeCode(hash) {
   const type = hash.charAt(0);
   let data = hash.substring(1);
   data = padBase64(data.replace(/-/g, "+").replace(/_/g, "/"));
-
   if (type === "c") {
     const binary = atob(data);
     const bytes = new Uint8Array(binary.length);
@@ -295,7 +296,6 @@ shareBtn.onclick = async () => {
   const code = editorEl.value.trim();
   const url = new URL(window.location.href);
   let finalUrl = "";
-
   if (!code || (!isServerConnected && code === defaultScad.trim())) {
     finalUrl = url.origin + url.pathname + url.search;
   } else {
@@ -307,15 +307,10 @@ shareBtn.onclick = async () => {
       finalUrl = url.origin + url.pathname + url.search;
     }
   }
-
   window.history.replaceState(null, "", finalUrl);
-
   try {
     if (navigator.share) {
-      await navigator.share({
-        title: "OpenSCAD GLTF Viewer",
-        url: finalUrl,
-      });
+      await navigator.share({ title: "OpenSCAD GLTF Viewer", url: finalUrl });
       const originalText = shareBtn.innerText;
       shareBtn.innerText = "✅ Shared!";
       setTimeout(() => (shareBtn.innerText = originalText), 2000);
@@ -349,7 +344,6 @@ function downloadBlob(blob, filename) {
   URL.revokeObjectURL(url);
 }
 
-// --- Drag and Drop SCAD ---
 const dragOverlay = document.getElementById("drag-overlay");
 window.addEventListener("dragenter", (e) => {
   e.preventDefault();
@@ -363,11 +357,9 @@ dragOverlay.addEventListener("dragleave", (e) => {
   e.preventDefault();
   dragOverlay.classList.remove("active");
 });
-
 window.addEventListener("drop", async (e) => {
   e.preventDefault();
   dragOverlay.classList.remove("active");
-
   if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
     const file = e.dataTransfer.files[0];
     if (
@@ -410,48 +402,35 @@ function renderBackendSelect() {
       backendSelectEl.appendChild(opt);
     });
   }
-  // Restore current selection tracker
   backendSelectEl.value = currentSelectedModelIdx;
 }
 
-// Bundle parameters from the new UI explicitly for scad.config.json
 function getBackendOptions() {
-  const opts = {
+  return {
     autoSmooth: autoSmoothCb.checked,
     creaseAngle: parseFloat(creaseAngleIn.value) || 30,
   };
-
-  return opts;
 }
 
-// Helper to grab and clean up names from the inputs or dropdown
 function getSanitizedNames() {
   let input = "";
   const idx = backendSelectEl.value;
-
-  if (idx === "") {
-    input = backendInputEl.value.trim();
-  } else {
-    input = serverConfig.assets[idx].input;
-  }
-
+  if (idx === "") input = backendInputEl.value.trim();
+  else input = serverConfig.assets[idx].input;
   if (input)
     input = input
       .replace(/\.scad$/i, "")
       .split(/[/\\]/)
       .pop();
-
   return { input };
 }
 
-// Detect and dynamically expose Save Button variations
 function checkChanges() {
   if (!serverConfig) return;
-
   const isNew = backendSelectEl.value === "";
   const input = getSanitizedNames().input;
   const currentOptions = getBackendOptions();
-  const currentContent = editorEl.value; // Server comparison should evaluate text directly
+  const currentContent = editorEl.value;
 
   let scadChanged = false;
   let configChanged = false;
@@ -462,33 +441,27 @@ function checkChanges() {
       configChanged = true;
     }
   } else {
-    if (currentContent !== currentModelOriginalState.content) {
+    if (currentContent !== currentModelOriginalState.content)
       scadChanged = true;
-    }
     if (
       currentOptions.autoSmooth !==
         currentModelOriginalState.options.autoSmooth ||
       currentOptions.creaseAngle !==
         currentModelOriginalState.options.creaseAngle
-    ) {
+    )
       configChanged = true;
-    }
   }
 
   const hasChanges = scadChanged || configChanged;
-
   if (hasChanges) {
     backendSingleSaveBtn.style.display = "flex";
     backendSingleSaveBtn.dataset.scadChanged = scadChanged.toString();
     backendSingleSaveBtn.dataset.configChanged = configChanged.toString();
 
-    if (scadChanged && configChanged) {
+    if (scadChanged && configChanged)
       backendSingleSaveBtn.innerText = "Save All";
-    } else if (scadChanged) {
-      backendSingleSaveBtn.innerText = "Save SCAD";
-    } else if (configChanged) {
-      backendSingleSaveBtn.innerText = "Save Config";
-    }
+    else if (scadChanged) backendSingleSaveBtn.innerText = "Save SCAD";
+    else if (configChanged) backendSingleSaveBtn.innerText = "Save Config";
   } else {
     backendSingleSaveBtn.style.display = "none";
   }
@@ -504,15 +477,16 @@ async function connectToServer(url, isAutoConnect = false) {
 
     backendConnectBtn.innerText = "Connected";
     backendUiEl.classList.add("active");
+    levelEditorSection.style.display = "flex";
 
-    // Clear placeholder when connected
     editorEl.placeholder = "";
 
-    currentSelectedModelIdx = ""; // Reset on new connection
+    currentSelectedModelIdx = "";
     renderBackendSelect();
 
-    // Enforce empty editor behavior for new models, unless we're auto-connecting
-    // and there is already content (like code loaded from a URL hash).
+    currentLevelIdx = "";
+    renderLevelSelect();
+
     if (!isAutoConnect || !editorEl.value.trim()) {
       editorEl.value = "";
     }
@@ -526,15 +500,14 @@ async function connectToServer(url, isAutoConnect = false) {
 
     return true;
   } catch (err) {
-    if (!isAutoConnect) {
-      alert("Connection failed: " + err.message);
-    } else {
-      console.warn("Auto-connect failed:", err.message);
-    }
+    if (!isAutoConnect) alert("Connection failed: " + err.message);
+    else console.warn("Auto-connect failed:", err.message);
+
     backendConnectBtn.innerText = "Connect";
     backendUiEl.classList.remove("active");
+    levelEditorSection.style.display = "none";
     isServerConnected = false;
-    editorEl.placeholder = defaultScad; // Restore fallback placeholder
+    editorEl.placeholder = defaultScad;
 
     return false;
   }
@@ -543,21 +516,39 @@ async function connectToServer(url, isAutoConnect = false) {
 backendConnectBtn.onclick = async () => {
   const url = backendUrlEl.value.trim();
   const success = await connectToServer(url, false);
-  if (success) {
-    compileAndRender(getEditorContent());
-  }
+  if (success) compileAndRender(getEditorContent());
 };
 
-// Update Config Parameters form when a new model is selected
 backendSelectEl.addEventListener("change", async () => {
-  // Check for unsaved changes before switching models
+  if (levelSelect.value !== "" && levelSelect.value !== "new") {
+    if (levelSaveBtn.style.display !== "none") {
+      if (
+        !confirm(
+          "You have unsaved changes in this level. Discard and switch to Model view?",
+        )
+      ) {
+        backendSelectEl.value = currentSelectedModelIdx;
+        return;
+      }
+    }
+    levelSelect.value = "";
+    currentLevelIdx = "";
+    levelObjectsContainer.style.display = "none";
+    levelCreateBtn.style.display = "inline-flex";
+    levelNameInput.style.display = "none";
+    levelDeleteBtn.style.display = "none";
+    levelSaveBtn.style.display = "none";
+    editorEl.disabled = false;
+    editorEl.style.opacity = "1";
+  }
+
   const hasUnsavedChanges = backendSingleSaveBtn.style.display !== "none";
   if (hasUnsavedChanges) {
-    const confirmDiscard = confirm(
-      "You have unsaved changes. Are you sure you want to discard them and load another model?",
-    );
-    if (!confirmDiscard) {
-      // Revert dropdown index to the tracked previous item
+    if (
+      !confirm(
+        "You have unsaved changes. Are you sure you want to discard them and load another model?",
+      )
+    ) {
       backendSelectEl.value = currentSelectedModelIdx;
       return;
     }
@@ -569,15 +560,10 @@ backendSelectEl.addEventListener("change", async () => {
   if (idx === "") {
     backendInputEl.value = "";
     backendInputEl.style.display = "block";
-
-    // Reset configuration options to default
     autoSmoothCb.checked = true;
     creaseAngleIn.value = "30";
-
-    // Enforce empty editor behavior for new models
     editorEl.value = "";
     compileAndRender(getEditorContent());
-
     currentModelOriginalState = {
       isNew: true,
       options: { autoSmooth: true, creaseAngle: 30 },
@@ -590,23 +576,18 @@ backendSelectEl.addEventListener("change", async () => {
     backendInputEl.value = input || "";
     backendInputEl.style.display = "none";
 
-    // Fill custom parameter config
     const opts = asset.options || {};
-
     autoSmoothCb.checked = opts.autoSmooth !== false;
     creaseAngleIn.value =
       opts.creaseAngle !== undefined ? opts.creaseAngle : 30;
 
-    // Automatically load the content
     try {
       statusEl.innerText = "Loading from server...";
       const res = await fetch(
         `${currentBackendUrl}/api/models?input=${encodeURIComponent(input)}`,
       );
-      if (!res.ok) {
-        const errData = await res.json();
-        throw new Error(errData.error || "Failed to load model");
-      }
+      if (!res.ok)
+        throw new Error((await res.json()).error || "Failed to load model");
       const data = await res.json();
       editorEl.value = data.content;
       compileAndRender(getEditorContent());
@@ -624,7 +605,6 @@ backendSelectEl.addEventListener("change", async () => {
       alert("Error loading model: " + err.message);
     }
   }
-
   syncSmoothState();
 });
 
@@ -635,11 +615,7 @@ backendSingleSaveBtn.onclick = async () => {
   const scadChanged = backendSingleSaveBtn.dataset.scadChanged === "true";
   const isNew = backendSelectEl.value === "";
 
-  const payload = {
-    input,
-    options: getBackendOptions(),
-  };
-
+  const payload = { input, options: getBackendOptions() };
   let method = "POST";
   if (scadChanged || isNew) {
     method = "POST";
@@ -655,27 +631,17 @@ backendSingleSaveBtn.onclick = async () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
+    if (!res.ok) throw new Error((await res.json()).error || "Save failed");
 
-    if (!res.ok) {
-      const errData = await res.json();
-      throw new Error(errData.error || "Save failed");
-    }
+    if (assetCache[input]) delete assetCache[input]; // clear cache for level reloading
 
     serverConfig = await fetchBackendConfig(currentBackendUrl);
 
-    // Track newly saved index prior to re-rendering so it is correctly loaded into UI
     const newIdx = serverConfig.assets.findIndex((a) => a.input === input);
-    if (newIdx >= 0) {
-      currentSelectedModelIdx = newIdx.toString();
-    } else {
-      currentSelectedModelIdx = "";
-    }
-
+    currentSelectedModelIdx = newIdx >= 0 ? newIdx.toString() : "";
     renderBackendSelect();
 
-    if (newIdx >= 0) {
-      backendInputEl.style.display = "none";
-    }
+    if (newIdx >= 0) backendInputEl.style.display = "none";
 
     currentModelOriginalState = {
       isNew: false,
@@ -684,10 +650,420 @@ backendSingleSaveBtn.onclick = async () => {
     };
     checkChanges();
   } catch (err) {
-    checkChanges(); // Reset text to correct changed state
+    checkChanges();
     alert("Error: " + err.message);
   }
 };
+
+// --- Level Hierarchy Logic ---
+
+function renderLevelSelect() {
+  levelSelect.innerHTML = '<option value="">-- No Level Selected --</option>';
+  levelSelect.innerHTML += '<option value="new">+ Create New Level</option>';
+
+  if (serverConfig && Array.isArray(serverConfig.levels)) {
+    serverConfig.levels.forEach((lvl, index) => {
+      const opt = document.createElement("option");
+      opt.value = index;
+      opt.innerText = lvl.name;
+      levelSelect.appendChild(opt);
+    });
+  }
+  levelSelect.value = currentLevelIdx;
+}
+
+function checkLevelChanges() {
+  if (currentLevelIdx === "" || currentLevelIdx === "new") {
+    levelSaveBtn.style.display = "none";
+    return;
+  }
+  const original = serverConfig.levels[currentLevelIdx];
+  if (JSON.stringify(original) !== JSON.stringify(currentLevelData)) {
+    levelSaveBtn.style.display = "inline-flex";
+  } else {
+    levelSaveBtn.style.display = "none";
+  }
+}
+
+async function saveConfigToServer() {
+  try {
+    const res = await fetch(`${currentBackendUrl}/api/config`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(serverConfig),
+    });
+    if (!res.ok) throw new Error("Failed to save config");
+    serverConfig = (await res.json()).config;
+  } catch (err) {
+    alert("Error saving config: " + err.message);
+  }
+}
+
+levelCreateBtn.addEventListener("click", async () => {
+  let name = levelNameInput.value.trim();
+  if (levelSelect.value !== "new" && !name) {
+    levelSelect.value = "new";
+    levelNameInput.style.display = "inline-flex";
+    return;
+  }
+  if (!name) return alert("Please enter a level name.");
+
+  serverConfig.levels = serverConfig.levels || [];
+  serverConfig.levels.push({ name, objects: [] });
+
+  await saveConfigToServer();
+
+  currentLevelIdx = (serverConfig.levels.length - 1).toString();
+  renderLevelSelect();
+  levelSelect.dispatchEvent(new Event("change"));
+});
+
+levelDeleteBtn.addEventListener("click", async () => {
+  if (!confirm("Are you sure you want to delete this level?")) return;
+  serverConfig.levels.splice(currentLevelIdx, 1);
+  await saveConfigToServer();
+  currentLevelIdx = "";
+  renderLevelSelect();
+  levelSelect.dispatchEvent(new Event("change"));
+});
+
+levelSaveBtn.addEventListener("click", async () => {
+  serverConfig.levels[currentLevelIdx] = JSON.parse(
+    JSON.stringify(currentLevelData),
+  );
+  await saveConfigToServer();
+  checkLevelChanges();
+});
+
+levelSelect.addEventListener("change", async () => {
+  if (levelSaveBtn.style.display !== "none") {
+    if (!confirm("You have unsaved changes in this level. Discard?")) {
+      levelSelect.value = currentLevelIdx;
+      return;
+    }
+  }
+
+  if (levelSelect.value === "") {
+    currentLevelIdx = "";
+    levelObjectsContainer.style.display = "none";
+    levelCreateBtn.style.display = "inline-flex";
+    levelNameInput.style.display = "none";
+    levelDeleteBtn.style.display = "none";
+    levelSaveBtn.style.display = "none";
+    editorEl.disabled = false;
+    editorEl.style.opacity = "1";
+    compileAndRender(getEditorContent());
+    return;
+  }
+
+  if (levelSelect.value === "new") {
+    currentLevelIdx = "new";
+    levelObjectsContainer.style.display = "none";
+    levelCreateBtn.style.display = "inline-flex";
+    levelNameInput.style.display = "inline-flex";
+    levelNameInput.value = "";
+    levelDeleteBtn.style.display = "none";
+    levelSaveBtn.style.display = "none";
+    editorEl.disabled = false;
+    editorEl.style.opacity = "1";
+    return;
+  }
+
+  currentLevelIdx = levelSelect.value;
+  levelObjectsContainer.style.display = "flex";
+  levelCreateBtn.style.display = "none";
+  levelNameInput.style.display = "none";
+  levelDeleteBtn.style.display = "inline-flex";
+  editorEl.disabled = true;
+  editorEl.style.opacity = "0.5";
+
+  currentLevelData = JSON.parse(
+    JSON.stringify(serverConfig.levels[currentLevelIdx]),
+  );
+
+  renderLevelObjectsUI();
+  await renderLevel();
+  checkLevelChanges();
+});
+
+addLevelObjectBtn.addEventListener("click", () => {
+  currentLevelData.objects.push({
+    asset: "",
+    position: [0, 0, 0],
+    rotation: [0, 0, 0],
+    scale: [1, 1, 1],
+    children: [],
+  });
+  checkLevelChanges();
+  renderLevelObjectsUI();
+  renderLevel(); // Trigger a rebuild to spawn the empty group
+});
+
+// Recursive UI Builder for Level Objects Tree
+function renderLevelObjectsUI() {
+  levelObjectsList.innerHTML = "";
+
+  const buildNodeUI = (obj, pathArray, container) => {
+    const row = document.createElement("div");
+    row.className = "level-object-row";
+
+    const header = document.createElement("div");
+    header.className = "level-object-header";
+
+    const assetSelect = document.createElement("select");
+    assetSelect.innerHTML = '<option value="">-- Empty Node --</option>';
+    serverConfig.assets.forEach((a) => {
+      const opt = document.createElement("option");
+      opt.value = a.input;
+      opt.innerText = a.input;
+      if (a.input === obj.asset) opt.selected = true;
+      assetSelect.appendChild(opt);
+    });
+
+    assetSelect.addEventListener("change", (e) => {
+      obj.asset = e.target.value;
+      checkLevelChanges();
+      renderLevel(); // Asset changes require full hierarchy rebuild
+    });
+
+    const actionsDiv = document.createElement("div");
+    actionsDiv.className = "level-object-actions";
+
+    const addChildBtn = document.createElement("button");
+    addChildBtn.innerText = "➕";
+    addChildBtn.title = "Add Child Object";
+    addChildBtn.onclick = () => {
+      if (!obj.children) obj.children = [];
+      obj.children.push({
+        asset: "",
+        position: [0, 0, 0],
+        rotation: [0, 0, 0],
+        scale: [1, 1, 1],
+        children: [],
+      });
+      checkLevelChanges();
+      renderLevelObjectsUI();
+      renderLevel();
+    };
+
+    const delBtn = document.createElement("button");
+    delBtn.innerText = "❌";
+    delBtn.title = "Delete Object";
+    delBtn.onclick = () => {
+      // Find parent array and remove self
+      if (pathArray.length === 1) {
+        currentLevelData.objects.splice(pathArray[0], 1);
+      } else {
+        let parentArray = currentLevelData.objects;
+        for (let i = 0; i < pathArray.length - 2; i++) {
+          parentArray = parentArray[pathArray[i]].children;
+        }
+        parentArray[pathArray[pathArray.length - 2]].children.splice(
+          pathArray[pathArray.length - 1],
+          1,
+        );
+      }
+      checkLevelChanges();
+      renderLevelObjectsUI();
+      renderLevel();
+    };
+
+    actionsDiv.appendChild(addChildBtn);
+    actionsDiv.appendChild(delBtn);
+
+    header.appendChild(assetSelect);
+    header.appendChild(actionsDiv);
+    row.appendChild(header);
+
+    const createTransformRow = (label, arrKey) => {
+      const tRow = document.createElement("div");
+      tRow.className = "transform-row";
+      const lbl = document.createElement("label");
+      lbl.innerText = label;
+      tRow.appendChild(lbl);
+
+      const xyz = ["X", "Y", "Z"];
+      xyz.forEach((axis, i) => {
+        const inp = document.createElement("input");
+        inp.type = "number";
+        inp.step = arrKey === "scale" ? "0.1" : "1";
+        inp.value = obj[arrKey][i];
+        inp.placeholder = axis;
+        inp.addEventListener("input", (e) => {
+          obj[arrKey][i] = parseFloat(e.target.value) || 0;
+          checkLevelChanges();
+          updateLevelObjectTransform(pathArray.join("-"), obj);
+        });
+        tRow.appendChild(inp);
+      });
+      return tRow;
+    };
+
+    row.appendChild(createTransformRow("P", "position"));
+    row.appendChild(createTransformRow("R", "rotation"));
+    row.appendChild(createTransformRow("S", "scale"));
+
+    container.appendChild(row);
+
+    // Recursively render children
+    if (obj.children && obj.children.length > 0) {
+      const childrenContainer = document.createElement("div");
+      childrenContainer.className = "level-children-container";
+      obj.children.forEach((child, idx) => {
+        buildNodeUI(child, [...pathArray, idx], childrenContainer);
+      });
+      container.appendChild(childrenContainer);
+    }
+  };
+
+  if (currentLevelData.objects) {
+    currentLevelData.objects.forEach((obj, idx) => {
+      buildNodeUI(obj, [idx], levelObjectsList);
+    });
+  }
+}
+
+// Transform Syncing for Hierarchy Nodes
+function updateLevelObjectTransform(pathStr, objData) {
+  const group = levelObjectsMeshes[pathStr];
+  if (group) {
+    group.position.set(
+      objData.position[0],
+      objData.position[1],
+      objData.position[2],
+    );
+    group.rotation.set(
+      THREE.MathUtils.degToRad(objData.rotation[0]),
+      THREE.MathUtils.degToRad(objData.rotation[1]),
+      THREE.MathUtils.degToRad(objData.rotation[2]),
+    );
+    group.scale.set(objData.scale[0], objData.scale[1], objData.scale[2]);
+
+    if (pathTracingCb.checked && pathTracer) {
+      pathTracer.setScene(scene, camera);
+    }
+  }
+}
+
+// Function to fetch, compile, and cache a single SCAD model as a parsed THREE.Scene
+async function getOrBuildAsset(assetName) {
+  if (assetCache[assetName]) return assetCache[assetName];
+
+  statusEl.innerText = `Compiling ${assetName}...`;
+  const res = await fetch(
+    `${currentBackendUrl}/api/models?input=${encodeURIComponent(assetName)}`,
+  );
+  if (!res.ok) throw new Error("Fetch failed");
+  const data = await res.json();
+
+  const assetConfig = serverConfig.assets.find((a) => a.input === assetName);
+  const opts = assetConfig?.options || {};
+
+  const gltfBuffer = await processScad(data.content, {
+    wasmUrl: wasmUrl,
+    binary: true,
+    autoSmooth: opts.autoSmooth !== false,
+    creaseAngle: opts.creaseAngle !== undefined ? opts.creaseAngle : 30,
+  });
+
+  const parsedGltf = await new Promise((resolve, reject) => {
+    let parseData = gltfBuffer;
+    if (gltfBuffer instanceof Uint8Array) {
+      parseData = gltfBuffer.buffer.slice(
+        gltfBuffer.byteOffset,
+        gltfBuffer.byteOffset + gltfBuffer.byteLength,
+      );
+    }
+    new GLTFLoader().parse(parseData, "", resolve, reject);
+  });
+
+  const sourceMesh = parsedGltf.scene;
+  sourceMesh.traverse((child) => {
+    if (child.isMesh) {
+      child.castShadow = true;
+      child.receiveShadow = true;
+    }
+  });
+
+  assetCache[assetName] = sourceMesh;
+  return sourceMesh;
+}
+
+// Preload all unique assets required by a level tree
+async function preloadLevelAssets(nodes) {
+  for (let obj of nodes) {
+    if (obj.asset && !assetCache[obj.asset]) {
+      try {
+        await getOrBuildAsset(obj.asset);
+      } catch (e) {
+        console.error(`Failed to load ${obj.asset}`, e);
+      }
+    }
+    if (obj.children && obj.children.length > 0) {
+      await preloadLevelAssets(obj.children);
+    }
+  }
+}
+
+// Recursively traverse JSON data and build equivalent Three.js Group Hierarchy
+async function buildLevelTree(nodes, parentGroup, pathPrefix) {
+  for (let i = 0; i < nodes.length; i++) {
+    const obj = nodes[i];
+    const currentPath = [...pathPrefix, i].join("-");
+
+    // Group creates the pivot and applies transforms for this node and its children
+    const group = new THREE.Group();
+    group.position.set(obj.position[0], obj.position[1], obj.position[2]);
+    group.rotation.set(
+      THREE.MathUtils.degToRad(obj.rotation[0]),
+      THREE.MathUtils.degToRad(obj.rotation[1]),
+      THREE.MathUtils.degToRad(obj.rotation[2]),
+    );
+    group.scale.set(obj.scale[0], obj.scale[1], obj.scale[2]);
+
+    if (obj.asset && assetCache[obj.asset]) {
+      const meshClone = assetCache[obj.asset].clone(); // Deep clone the cached scene graph
+      group.add(meshClone);
+    }
+
+    levelObjectsMeshes[currentPath] = group;
+    parentGroup.add(group);
+
+    if (obj.children && obj.children.length > 0) {
+      await buildLevelTree(obj.children, group, [...pathPrefix, i]);
+    }
+  }
+}
+
+async function renderLevel() {
+  clearCurrentMesh();
+  levelObjectsMeshes = {};
+
+  if (
+    !currentLevelData ||
+    !currentLevelData.objects ||
+    currentLevelData.objects.length === 0
+  ) {
+    statusEl.innerText = "Empty Level";
+    return;
+  }
+
+  // 1. Gather & build any uncached SCAD models first so ThreeJS build is synchronous and fast
+  await preloadLevelAssets(currentLevelData.objects);
+
+  // 2. Build the actual Scene Graph
+  statusEl.innerText = "Building Level Tree...";
+  const sceneGroup = new THREE.Group();
+  await buildLevelTree(currentLevelData.objects, sceneGroup, []);
+
+  animControlsSection.style.display = "none";
+  currentAction = null;
+
+  currentMesh = sceneGroup;
+  scene.add(currentMesh);
+  fitCamera();
+  statusEl.innerText = `Level: ${currentLevelData.name}`;
+}
 
 // --- Three.js Setup ---
 const scene = new THREE.Scene();
@@ -763,9 +1139,7 @@ pathTracer.setScene(scene, camera);
 // --- Animation Controls ---
 function playAnimation(index) {
   if (!mixer || !currentAnimations[index]) return;
-  if (currentAction) {
-    currentAction.stop();
-  }
+  if (currentAction) currentAction.stop();
   const clip = currentAnimations[index];
   currentAction = mixer.clipAction(clip);
   currentAction.play();
@@ -780,7 +1154,6 @@ function playAnimation(index) {
 animSelect.addEventListener("change", (e) => {
   playAnimation(parseInt(e.target.value));
 });
-
 animPlayBtn.addEventListener("click", () => {
   if (!currentAction) return;
   isPlaying = !isPlaying;
@@ -813,12 +1186,10 @@ animSlider.addEventListener("input", (e) => {
   if (currentAction) {
     const duration = currentAction.getClip().duration;
     currentAction.time = parseFloat(e.target.value) * duration;
-    // Force mixer to update to the new manual scrub time
     if (mixer) {
       mixer.update(0);
-      if (pathTracingCb.checked && pathTracer) {
+      if (pathTracingCb.checked && pathTracer)
         pathTracer.setScene(scene, camera);
-      }
     }
   }
 });
@@ -833,16 +1204,18 @@ function clearCurrentMesh() {
     }
     currentAction = null;
     scene.remove(currentMesh);
-    currentMesh.traverse((child) => {
-      if (child.isMesh) {
-        child.geometry.dispose();
-        if (Array.isArray(child.material)) {
-          child.material.forEach((m) => m.dispose());
-        } else if (child.material) {
-          child.material.dispose();
+    // Be careful disposing geometry/materials when using Cloned assets in levels,
+    // they share geometries in assetCache! Only clear if not using level cache.
+    if (levelSelect.value === "" || levelSelect.value === "new") {
+      currentMesh.traverse((child) => {
+        if (child.isMesh) {
+          child.geometry.dispose();
+          if (Array.isArray(child.material))
+            child.material.forEach((m) => m.dispose());
+          else if (child.material) child.material.dispose();
         }
-      }
-    });
+      });
+    }
     currentMesh = null;
   }
 }
@@ -850,11 +1223,8 @@ function clearCurrentMesh() {
 function rebuildSceneFromGLTF(gltfData) {
   return new Promise((resolve, reject) => {
     clearCurrentMesh();
-
-    // Parse the data directly
     let parseData = gltfData;
     if (gltfData instanceof Uint8Array) {
-      // Convert Uint8Array to ArrayBuffer for the binary loader
       parseData = gltfData.buffer.slice(
         gltfData.byteOffset,
         gltfData.byteOffset + gltfData.byteLength,
@@ -884,7 +1254,6 @@ function rebuildSceneFromGLTF(gltfData) {
           currentAction = null;
         }
 
-        // The bridge handled the smoothing. We only set up shadows.
         currentMesh.traverse((child) => {
           if (child.isMesh) {
             child.castShadow = true;
@@ -958,8 +1327,6 @@ function animate() {
 
   if (mixer && !pathTracingCb.checked) {
     mixer.update(delta);
-
-    // Sync UI Slider with current Animation progress
     if (currentAction && isPlaying && !isDraggingSlider) {
       const duration = currentAction.getClip().duration;
       if (duration > 0) {
@@ -1003,20 +1370,16 @@ setTimeout(() => window.dispatchEvent(new Event("resize")), 100);
 editorEl.placeholder = defaultScad;
 
 (async function init() {
-  // First handle any shared URL hash codes so they don't get overwritten
   if (window.location.hash && window.location.hash.length > 1) {
     try {
       const hash = window.location.hash.substring(1);
       const decoded = await decodeCode(hash);
-      if (decoded) {
-        editorEl.value = decoded;
-      }
+      if (decoded) editorEl.value = decoded;
     } catch (e) {
       console.error("Failed to decode SCAD from URL hash", e);
     }
   }
 
-  // Silently try to auto-connect to the backend on load only if local mode
   const isLocal = ["localhost", "127.0.0.1", ""].includes(
     window.location.hostname,
   );
@@ -1025,9 +1388,6 @@ editorEl.placeholder = defaultScad;
     await connectToServer(url, true);
   }
 
-  // Double-check UI state matches connection result + URL hash overrides
   checkChanges();
-
-  // Initial render handles the result (empty if connected, fallback if not connected)
   setTimeout(() => compileAndRender(getEditorContent()), 500);
 })();
