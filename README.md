@@ -8,11 +8,12 @@ A modern, web-based editor and 3D viewer for OpenSCAD. It natively compiles `.sc
 
 ## ✨ Features
 
-- **100% Client-Side Compilation**: Compiles OpenSCAD scripts directly to `.glb` (binary) format entirely in the browser using [`openscad-gltf-wasm`](https://github.com/iliagrigorevdev/openscad-gltf-wasm). No backend server is required.
+- **100% Client-Side Compilation**: Compiles OpenSCAD scripts directly to `.glb` (binary) format entirely in the browser using [`openscad-gltf-bridge`](https://github.com/iliagrigorevdev/openscad-gltf-bridge) and WebAssembly.
 - **Photorealistic GPU Path Tracing**: Toggle on **Path Tracing** for incredibly realistic lighting, soft shadows, and physically accurate glass refractions/transmissions powered by `three-gpu-pathtracer`.
 - **Extended PBR Support**: Visualize advanced material properties extending standard OpenSCAD, including `metalness`, `roughness`, `transmission` (glass), `clearcoat`, `sheen`, `ior`, `emissive`, `specular`, and `iridescence`.
-- **Skeletal Animations**: Fully supports parsing and playing hierarchical bone animations defined in the custom SCAD engine.
-- **Auto Smooth Geometry**: Toggle on **Auto Smooth** to automatically calculate and apply smooth vertex normals to blocky CAD geometry using a custom angle-based normal welding algorithm.
+- **Skeletal Animations**: Fully supports parsing and playing hierarchical bone animations defined in the custom SCAD engine, complete with timeline playback controls.
+- **Auto Smooth & Crease Angle**: Toggle on **Auto Smooth** to automatically calculate and apply smooth vertex normals to blocky CAD geometry. Fine-tune the **Crease Angle** to perfectly preserve intended sharp edges.
+- **Local File Sync (SCAD Serve)**: Connect the web viewer to the local filesystem using the `openscad-gltf-bridge` CLI. Instantly manage, edit, and save `.scad` files and their export configurations (`scad.config.json`) directly from your browser.
 - **Compressed URL Sharing**: Share your designs instantly without a database. The app uses the native `CompressionStream` API to deflate your SCAD code and embed it into the URL hash, making even complex models shareable via a single link.
 - **Drag-and-Drop Support**: Instantly load existing scripts by dragging and dropping any `.scad` file directly into the browser window.
 - **AI Prompt Generator**: Because LLMs don't know about this engine's custom syntax, the viewer includes a built-in tool to generate AI-ready prompts. Customise the required PBR/Animation rules, describe your object, copy the prompt, and paste it into Gemini or Claude to get perfectly compatible SCAD code!
@@ -31,17 +32,58 @@ A modern, web-based editor and 3D viewer for OpenSCAD. It natively compiles `.sc
 ### 2. The SCAD Editor
 
 - **Load & Drag-and-Drop**: Click the **📁 Load** button to open a file dialog, or drag a `.scad` file from your computer and drop it anywhere on the app to instantly load its contents into the editor and trigger a render.
-- Toggle **Auto Render** to automatically compile and update the 3D viewer when you stop typing (debounced at 800ms). Enabled by default. (Note: If the editor is empty, it will fall back to a default sample scene).
+- Toggle **Auto Render** to automatically compile and update the 3D viewer when you stop typing (debounced at 800ms). Enabled by default. (Note: If the editor is empty and not connected to a backend, it will fall back to a default sample scene).
 - You can manually trigger a render using the **▶ Render** button.
 - Use **⬇ SCAD** or **⬇ GLTF** to download your work. _(Note: If "Auto Smooth" is enabled, the `.glb` export will preserve the computed smooth vertex normals!)_
 - Click **🔗 Share** to generate a permanent link to your current script. On mobile devices, this opens the native share sheet; on desktop, it copies the link to your clipboard. Since the data is stored in the URL hash, your code is never sent to a server.
 - Use **📷 Image** to capture and download a high-quality `.png` screenshot of the 3D viewport.
 
-### 3. Viewer Controls
+### 3. Animation Controls
+
+- If your model contains valid OpenSCAD animations, an **Animation Controls** section will dynamically appear.
+- Select which animation to play from the dropdown menu.
+- Use the **▶ Play / ⏸ Pause** button to control playback.
+- Scrub through the animation manually using the provided timeline slider.
+
+### 4. Local File Sync (SCAD Serve Backend)
+
+The viewer can connect to a local development environment to save files directly to your hard drive and manage a build pipeline using the [`openscad-gltf-bridge`](https://github.com/iliagrigorevdev/openscad-gltf-bridge) CLI.
+
+**1. Start the local backend server:**
+Run this in your project folder to bridge the web editor to your filesystem.
+
+- **Option A: Run directly (No installation)**
+  ```bash
+  npx -p github:iliagrigorevdev/openscad-gltf-bridge scad-serve
+  ```
+- **Option B: If installed locally (`npm install --save-dev github:iliagrigorevdev/openscad-gltf-bridge`)**
+  ```bash
+  npx scad-serve
+  ```
+
+**2. Connect and Edit:**
+
+1. In the Web Viewer, ensure the Backend URL is correct and click **Connect**.
+2. Select `-- Create New Model --` to start a new file, or choose an existing model from the dropdown.
+3. The UI tracks unsaved changes. Use the **Save** buttons to update your `.scad` files and `scad.config.json` on your disk.
+
+**3. Batch Compilation:**
+Once your models are configured, you can batch-compile the entire project to `.glb` format (applying all Auto Smooth and Crease Angle settings) from your terminal:
+
+- **Option A: Run directly**
+  ```bash
+  npx -p github:iliagrigorevdev/openscad-gltf-bridge scad-build
+  ```
+- **Option B: If installed locally**
+  ```bash
+  npx scad-build
+  ```
+
+### 5. Viewer Controls
 
 - **Orbit Controls**: Left-click and drag to rotate, right-click and drag to pan, scroll to zoom.
 - **Path Tracing Toggle**: Switches from the standard WebGL rasterizer to a physically-based path tracer. This is highly recommended for materials with `transmission` (glass/water) to see accurate refractions.
-- **Auto Smooth Toggle**: Averages face normals based on a crease angle, instantly giving your faceted models a smooth, modern 3D look.
+- **Auto Smooth**: Averages face normals based on the specified crease angle, instantly giving your faceted models a smooth, modern 3D look.
 
 ## 🚀 Local Development
 
@@ -58,7 +100,7 @@ npm run dev
 ## 🛠 Tech Stack
 
 - **Framework**: Vanilla JS + [Vite](https://vitejs.dev/)
-- **Core Compiler**: Custom OpenSCAD Emscripten port [`openscad-gltf-wasm`](https://github.com/iliagrigorevdev/openscad-gltf-wasm)
+- **Core Processing Engine**: [`openscad-gltf-bridge`](https://github.com/iliagrigorevdev/openscad-gltf-bridge) wrapping [`openscad-gltf-wasm`](https://github.com/iliagrigorevdev/openscad-gltf-wasm)
 - **3D Engine**: [Three.js](https://threejs.org/)
 - **Path Tracing**: [three-gpu-pathtracer](https://github.com/gkjohnson/three-gpu-pathtracer)
 - **Compression**: Native browser `CompressionStream` (deflate-raw) for URL state management.
