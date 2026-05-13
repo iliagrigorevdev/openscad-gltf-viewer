@@ -34,8 +34,7 @@ const backendUiEl = document.getElementById("backend-ui");
 const backendSelectEl = document.getElementById("backend-select");
 const backendInputEl = document.getElementById("backend-input");
 
-const backendSaveBtn = document.getElementById("backend-save-btn");
-const backendUpdateBtn = document.getElementById("backend-update-btn");
+const backendSingleSaveBtn = document.getElementById("backend-single-save-btn");
 
 let currentMesh = null;
 let currentGltfData = null;
@@ -44,6 +43,13 @@ let isCompiling = false;
 let pendingCode = null;
 let mixer = null;
 let captureNextFrame = false;
+
+// Track the baseline state loaded from the server to compute changes
+let currentModelOriginalState = {
+  isNew: true,
+  options: { autoSmooth: true, creaseAngle: 30 },
+  content: "",
+};
 
 function syncSmoothState() {
   creaseAngleIn.disabled = !autoSmoothCb.checked;
@@ -58,14 +64,18 @@ pathTracingCb.addEventListener("change", () => {
 // Force a re-compile if Auto Smooth changes
 autoSmoothCb.addEventListener("change", () => {
   syncSmoothState();
+  checkChanges();
   compileAndRender(editorEl.value || defaultScad);
 });
 
 creaseAngleIn.addEventListener("change", () => {
+  checkChanges();
   if (autoSmoothCb.checked) {
     compileAndRender(editorEl.value || defaultScad);
   }
 });
+creaseAngleIn.addEventListener("input", checkChanges);
+backendInputEl.addEventListener("input", checkChanges);
 
 // --- Prompt Logic ---
 copyPromptBtn.onclick = async () => {
@@ -112,7 +122,6 @@ async function compileAndRender(scadCode) {
 
     const opts = {
       wasmUrl: wasmUrl,
-
       autoSmooth: autoSmoothCb.checked,
       creaseAngle: creaseDeg,
     };
@@ -140,6 +149,7 @@ renderBtn.onclick = () => compileAndRender(editorEl.value || defaultScad);
 
 let renderTimeout;
 editorEl.addEventListener("input", (e) => {
+  checkChanges();
   clearTimeout(renderTimeout);
   if (!autoRenderCb.checked) {
     statusEl.innerText = "Changes pending (click Render)";
@@ -164,6 +174,7 @@ loadScadBtn.onclick = () => {
       try {
         const text = await e.target.files[0].text();
         editorEl.value = text;
+        checkChanges();
         compileAndRender(text);
       } catch (err) {
         alert("Failed to read file: " + err.message);
@@ -340,6 +351,7 @@ window.addEventListener("drop", async (e) => {
       try {
         const text = await file.text();
         editorEl.value = text;
+        checkChanges();
         compileAndRender(text);
       } catch (err) {
         alert("Failed to read file: " + err.message);
@@ -373,69 +385,6 @@ function renderBackendSelect() {
   }
 }
 
-backendConnectBtn.onclick = async () => {
-  const url = backendUrlEl.value.trim();
-  if (!url) return;
-  try {
-    backendConnectBtn.innerText = "Connecting...";
-    serverConfig = await fetchBackendConfig(url);
-    currentBackendUrl = url;
-    backendConnectBtn.innerText = "Connected";
-    backendUiEl.classList.add("active");
-    renderBackendSelect();
-  } catch (err) {
-    alert("Connection failed: " + err.message);
-    backendConnectBtn.innerText = "Connect";
-    backendUiEl.classList.remove("active");
-  }
-};
-
-// Update Config Parameters form when a new model is selected
-backendSelectEl.addEventListener("change", async () => {
-  const idx = backendSelectEl.value;
-
-  if (idx === "") {
-    backendInputEl.value = "";
-    backendInputEl.style.display = "block";
-
-    // Reset configuration options to default
-
-    autoSmoothCb.checked = true;
-    creaseAngleIn.value = "30";
-  } else {
-    const asset = serverConfig.assets[idx];
-    const input = asset.input;
-    backendInputEl.value = input || "";
-    backendInputEl.style.display = "none";
-
-    // Fill custom parameter config
-    const opts = asset.options || {};
-
-    autoSmoothCb.checked = opts.autoSmooth !== false;
-    creaseAngleIn.value =
-      opts.creaseAngle !== undefined ? opts.creaseAngle : 30;
-
-    // Automatically load the content
-    try {
-      statusEl.innerText = "Loading from server...";
-      const res = await fetch(
-        `${currentBackendUrl}/api/models?input=${encodeURIComponent(input)}`,
-      );
-      if (!res.ok) {
-        const errData = await res.json();
-        throw new Error(errData.error || "Failed to load model");
-      }
-      const data = await res.json();
-      editorEl.value = data.content;
-      compileAndRender(data.content);
-    } catch (err) {
-      alert("Error loading model: " + err.message);
-    }
-  }
-
-  syncSmoothState();
-});
-
 // Bundle parameters from the new UI explicitly for scad.config.json
 function getBackendOptions() {
   const opts = {
@@ -466,29 +415,175 @@ function getSanitizedNames() {
   return { input };
 }
 
-backendSaveBtn.onclick = async () => {
+// Detect and dynamically expose Save Button variations
+function checkChanges() {
+  if (!serverConfig) return;
+
+  const isNew = backendSelectEl.value === "";
+  const input = getSanitizedNames().input;
+  const currentOptions = getBackendOptions();
+  const currentContent = editorEl.value || defaultScad;
+
+  let scadChanged = false;
+  let configChanged = false;
+
+  if (isNew) {
+    if (input) {
+      scadChanged = true;
+      configChanged = true;
+    }
+  } else {
+    if (currentContent !== currentModelOriginalState.content) {
+      scadChanged = true;
+    }
+    if (
+      currentOptions.autoSmooth !==
+        currentModelOriginalState.options.autoSmooth ||
+      currentOptions.creaseAngle !==
+        currentModelOriginalState.options.creaseAngle
+    ) {
+      configChanged = true;
+    }
+  }
+
+  const hasChanges = scadChanged || configChanged;
+
+  if (hasChanges) {
+    backendSingleSaveBtn.style.display = "flex";
+    backendSingleSaveBtn.dataset.scadChanged = scadChanged.toString();
+    backendSingleSaveBtn.dataset.configChanged = configChanged.toString();
+
+    if (scadChanged && configChanged) {
+      backendSingleSaveBtn.innerText = "Save All";
+    } else if (scadChanged) {
+      backendSingleSaveBtn.innerText = "Save SCAD";
+    } else if (configChanged) {
+      backendSingleSaveBtn.innerText = "Save Config";
+    }
+  } else {
+    backendSingleSaveBtn.style.display = "none";
+  }
+}
+
+backendConnectBtn.onclick = async () => {
+  const url = backendUrlEl.value.trim();
+  if (!url) return;
+  try {
+    backendConnectBtn.innerText = "Connecting...";
+    serverConfig = await fetchBackendConfig(url);
+    currentBackendUrl = url;
+    backendConnectBtn.innerText = "Connected";
+    backendUiEl.classList.add("active");
+    renderBackendSelect();
+
+    currentModelOriginalState = {
+      isNew: true,
+      options: getBackendOptions(),
+      content: editorEl.value || defaultScad,
+    };
+    checkChanges();
+  } catch (err) {
+    alert("Connection failed: " + err.message);
+    backendConnectBtn.innerText = "Connect";
+    backendUiEl.classList.remove("active");
+  }
+};
+
+// Update Config Parameters form when a new model is selected
+backendSelectEl.addEventListener("change", async () => {
+  const idx = backendSelectEl.value;
+
+  if (idx === "") {
+    backendInputEl.value = "";
+    backendInputEl.style.display = "block";
+
+    // Reset configuration options to default
+
+    autoSmoothCb.checked = true;
+    creaseAngleIn.value = "30";
+
+    currentModelOriginalState = {
+      isNew: true,
+      options: { autoSmooth: true, creaseAngle: 30 },
+      content: editorEl.value || defaultScad,
+    };
+    checkChanges();
+  } else {
+    const asset = serverConfig.assets[idx];
+    const input = asset.input;
+    backendInputEl.value = input || "";
+    backendInputEl.style.display = "none";
+
+    // Fill custom parameter config
+    const opts = asset.options || {};
+
+    autoSmoothCb.checked = opts.autoSmooth !== false;
+    creaseAngleIn.value =
+      opts.creaseAngle !== undefined ? opts.creaseAngle : 30;
+
+    // Automatically load the content
+    try {
+      statusEl.innerText = "Loading from server...";
+      const res = await fetch(
+        `${currentBackendUrl}/api/models?input=${encodeURIComponent(input)}`,
+      );
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || "Failed to load model");
+      }
+      const data = await res.json();
+      editorEl.value = data.content;
+      compileAndRender(data.content);
+
+      currentModelOriginalState = {
+        isNew: false,
+        options: {
+          autoSmooth: autoSmoothCb.checked,
+          creaseAngle: parseFloat(creaseAngleIn.value) || 30,
+        },
+        content: data.content,
+      };
+      checkChanges();
+    } catch (err) {
+      alert("Error loading model: " + err.message);
+    }
+  }
+
+  syncSmoothState();
+});
+
+backendSingleSaveBtn.onclick = async () => {
   const { input } = getSanitizedNames();
   if (!input) return alert("Input name is required.");
+
+  const scadChanged = backendSingleSaveBtn.dataset.scadChanged === "true";
+  const isNew = backendSelectEl.value === "";
 
   const payload = {
     input,
     options: getBackendOptions(),
-    content: editorEl.value || defaultScad,
   };
 
+  let method = "POST";
+  if (scadChanged || isNew) {
+    method = "POST";
+    payload.content = editorEl.value || defaultScad;
+  } else {
+    method = "PATCH";
+  }
+
   try {
-    backendSaveBtn.innerText = "Saving...";
+    backendSingleSaveBtn.innerText = "Saving...";
     const res = await fetch(`${currentBackendUrl}/api/models`, {
-      method: "POST",
+      method,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
+
     if (!res.ok) {
       const errData = await res.json();
       throw new Error(errData.error || "Save failed");
     }
-
-    backendSaveBtn.innerText = "Save SCAD + Config";
 
     serverConfig = await fetchBackendConfig(currentBackendUrl);
     renderBackendSelect();
@@ -499,45 +594,14 @@ backendSaveBtn.onclick = async () => {
       backendInputEl.style.display = "none";
     }
 
-    alert("Saved & Build Triggered!");
+    currentModelOriginalState = {
+      isNew: false,
+      options: getBackendOptions(),
+      content: editorEl.value || defaultScad,
+    };
+    checkChanges();
   } catch (err) {
-    backendSaveBtn.innerText = "Save SCAD + Config";
-    alert("Error: " + err.message);
-  }
-};
-
-backendUpdateBtn.onclick = async () => {
-  const { input } = getSanitizedNames();
-  if (!input) return alert("Input name is required.");
-
-  const payload = {
-    input,
-    options: getBackendOptions(),
-  };
-
-  try {
-    backendUpdateBtn.innerText = "Updating...";
-    const res = await fetch(`${currentBackendUrl}/api/models`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) {
-      const errData = await res.json();
-      throw new Error(errData.error || "Update failed");
-    }
-
-    backendUpdateBtn.innerText = "Update Config Only";
-
-    serverConfig = await fetchBackendConfig(currentBackendUrl);
-    renderBackendSelect();
-
-    const idx = serverConfig.assets.findIndex((a) => a.input === input);
-    if (idx >= 0) backendSelectEl.value = idx;
-
-    alert("Config Updated & Build Triggered!");
-  } catch (err) {
-    backendUpdateBtn.innerText = "Update Config Only";
+    checkChanges(); // Reset text to correct changed state
     alert("Error: " + err.message);
   }
 };
@@ -789,6 +853,7 @@ editorEl.placeholder = defaultScad;
       const decoded = await decodeCode(hash);
       if (decoded) {
         editorEl.value = decoded;
+        checkChanges();
       }
     } catch (e) {
       console.error("Failed to decode SCAD from URL hash", e);

@@ -205,9 +205,8 @@ button.primary:hover {
   min-width: 0;
 }
 
-#backend-save-btn,
-#backend-update-btn {
-  flex: 1;
+#backend-single-save-btn {
+  flex-shrink: 0;
 }
 
 /* --- Viewer Elements --- */
