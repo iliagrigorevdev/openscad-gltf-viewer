@@ -485,9 +485,8 @@ function checkChanges() {
   }
 }
 
-backendConnectBtn.onclick = async () => {
-  const url = backendUrlEl.value.trim();
-  if (!url) return;
+async function connectToServer(url, isAutoConnect = false) {
+  if (!url) return false;
   try {
     backendConnectBtn.innerText = "Connecting...";
     serverConfig = await fetchBackendConfig(url);
@@ -503,9 +502,11 @@ backendConnectBtn.onclick = async () => {
     currentSelectedModelIdx = ""; // Reset on new connection
     renderBackendSelect();
 
-    // Enforce empty editor behavior for new models on connection
-    editorEl.value = "";
-    compileAndRender(getEditorContent());
+    // Enforce empty editor behavior for new models, unless we're auto-connecting
+    // and there is already content (like code loaded from a URL hash).
+    if (!isAutoConnect || !editorEl.value.trim()) {
+      editorEl.value = "";
+    }
 
     currentModelOriginalState = {
       isNew: true,
@@ -513,12 +514,28 @@ backendConnectBtn.onclick = async () => {
       content: "",
     };
     checkChanges();
+
+    return true;
   } catch (err) {
-    alert("Connection failed: " + err.message);
+    if (!isAutoConnect) {
+      alert("Connection failed: " + err.message);
+    } else {
+      console.warn("Auto-connect failed:", err.message);
+    }
     backendConnectBtn.innerText = "Connect";
     backendUiEl.classList.remove("active");
     isServerConnected = false;
     editorEl.placeholder = defaultScad; // Restore fallback placeholder
+
+    return false;
+  }
+}
+
+backendConnectBtn.onclick = async () => {
+  const url = backendUrlEl.value.trim();
+  const success = await connectToServer(url, false);
+  if (success) {
+    compileAndRender(getEditorContent());
   }
 };
 
@@ -908,19 +925,26 @@ setTimeout(() => window.dispatchEvent(new Event("resize")), 100);
 editorEl.placeholder = defaultScad;
 
 (async function init() {
+  // First handle any shared URL hash codes so they don't get overwritten
   if (window.location.hash && window.location.hash.length > 1) {
     try {
       const hash = window.location.hash.substring(1);
       const decoded = await decodeCode(hash);
       if (decoded) {
         editorEl.value = decoded;
-        checkChanges();
       }
     } catch (e) {
       console.error("Failed to decode SCAD from URL hash", e);
     }
   }
 
-  // Initial render utilizes the fallback system
+  // Silently try to auto-connect to the backend on load
+  const url = backendUrlEl.value.trim();
+  await connectToServer(url, true);
+
+  // Double-check UI state matches connection result + URL hash overrides
+  checkChanges();
+
+  // Initial render handles the result (empty if connected, fallback if not connected)
   setTimeout(() => compileAndRender(getEditorContent()), 500);
 })();
