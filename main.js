@@ -36,6 +36,7 @@ const backendInputEl = document.getElementById("backend-input");
 
 const backendSingleSaveBtn = document.getElementById("backend-single-save-btn");
 
+let currentSelectedModelIdx = ""; // Track current selection for unsaved changes confirmation
 let currentMesh = null;
 let currentGltfData = null;
 let currentAnimations = [];
@@ -383,6 +384,8 @@ function renderBackendSelect() {
       backendSelectEl.appendChild(opt);
     });
   }
+  // Restore current selection tracker
+  backendSelectEl.value = currentSelectedModelIdx;
 }
 
 // Bundle parameters from the new UI explicitly for scad.config.json
@@ -474,6 +477,8 @@ backendConnectBtn.onclick = async () => {
     currentBackendUrl = url;
     backendConnectBtn.innerText = "Connected";
     backendUiEl.classList.add("active");
+
+    currentSelectedModelIdx = ""; // Reset on new connection
     renderBackendSelect();
 
     currentModelOriginalState = {
@@ -491,7 +496,21 @@ backendConnectBtn.onclick = async () => {
 
 // Update Config Parameters form when a new model is selected
 backendSelectEl.addEventListener("change", async () => {
+  // Check for unsaved changes before switching models
+  const hasUnsavedChanges = backendSingleSaveBtn.style.display !== "none";
+  if (hasUnsavedChanges) {
+    const confirmDiscard = confirm(
+      "You have unsaved changes. Are you sure you want to discard them and load another model?",
+    );
+    if (!confirmDiscard) {
+      // Revert dropdown index to the tracked previous item
+      backendSelectEl.value = currentSelectedModelIdx;
+      return;
+    }
+  }
+
   const idx = backendSelectEl.value;
+  currentSelectedModelIdx = idx;
 
   if (idx === "") {
     backendInputEl.value = "";
@@ -586,11 +605,18 @@ backendSingleSaveBtn.onclick = async () => {
     }
 
     serverConfig = await fetchBackendConfig(currentBackendUrl);
-    renderBackendSelect();
 
+    // Track newly saved index prior to re-rendering so it is correctly loaded into UI
     const newIdx = serverConfig.assets.findIndex((a) => a.input === input);
     if (newIdx >= 0) {
-      backendSelectEl.value = newIdx;
+      currentSelectedModelIdx = newIdx.toString();
+    } else {
+      currentSelectedModelIdx = "";
+    }
+
+    renderBackendSelect();
+
+    if (newIdx >= 0) {
       backendInputEl.style.display = "none";
     }
 
