@@ -1016,9 +1016,14 @@ editorEl.placeholder = defaultScad;
     }
   }
 
-  // Silently try to auto-connect to the backend on load
-  const url = backendUrlEl.value.trim();
-  await connectToServer(url, true);
+  // Silently try to auto-connect to the backend on load only if local mode
+  const isLocal = ["localhost", "127.0.0.1", ""].includes(
+    window.location.hostname,
+  );
+  if (isLocal) {
+    const url = backendUrlEl.value.trim();
+    await connectToServer(url, true);
+  }
 
   // Double-check UI state matches connection result + URL hash overrides
   checkChanges();
