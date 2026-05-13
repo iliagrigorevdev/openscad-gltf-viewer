@@ -4,7 +4,6 @@ import { processScad } from "openscad-gltf-bridge";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
-import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js";
 import { WebGLPathTracer } from "three-gpu-pathtracer";
 import { HDRLoader } from "three/examples/jsm/loaders/HDRLoader.js";
 
@@ -26,7 +25,6 @@ const autoSmoothCb = document.getElementById("auto-smooth-cb");
 const creaseAngleIn = document.getElementById("crease-angle-in");
 const pathTracingCb = document.getElementById("path-tracing-cb");
 const exportBinaryCb = document.getElementById("export-binary-cb");
-const exportCompressionCb = document.getElementById("export-compression-cb");
 const resizeIn = document.getElementById("resize-in");
 const statusEl = document.getElementById("status");
 const viewerEl = document.getElementById("viewer");
@@ -52,18 +50,6 @@ function syncSmoothState() {
   creaseAngleIn.disabled = !autoSmoothCb.checked;
 }
 
-function syncCompressionState() {
-  if (exportCompressionCb.checked) {
-    exportBinaryCb.checked = true;
-    exportBinaryCb.disabled = true;
-    pathTracingCb.checked = false;
-    pathTracingCb.disabled = true;
-  } else {
-    exportBinaryCb.disabled = false;
-    pathTracingCb.disabled = false;
-  }
-}
-
 pathTracingCb.addEventListener("change", () => {
   if (pathTracingCb.checked && pathTracer) {
     pathTracer.setScene(scene, camera);
@@ -80,11 +66,6 @@ creaseAngleIn.addEventListener("change", () => {
   if (autoSmoothCb.checked) {
     compileAndRender(editorEl.value || defaultScad);
   }
-});
-
-exportCompressionCb.addEventListener("change", () => {
-  syncCompressionState();
-  if (autoRenderCb.checked) compileAndRender(editorEl.value || defaultScad);
 });
 
 resizeIn.addEventListener("change", () => {
@@ -132,7 +113,6 @@ async function compileAndRender(scadCode) {
 
   try {
     const isBinary = exportBinaryCb.checked;
-    const isCompressed = exportCompressionCb.checked;
 
     let creaseDeg = parseFloat(creaseAngleIn.value);
     if (isNaN(creaseDeg)) creaseDeg = 30;
@@ -142,7 +122,6 @@ async function compileAndRender(scadCode) {
       binary: isBinary,
       autoSmooth: autoSmoothCb.checked,
       creaseAngle: creaseDeg,
-      compression: isCompressed,
     };
 
     let resizeVal = parseFloat(resizeIn.value);
@@ -439,7 +418,6 @@ backendSelectEl.addEventListener("change", async () => {
     exportBinaryCb.checked = true;
     autoSmoothCb.checked = true;
     creaseAngleIn.value = "30";
-    exportCompressionCb.checked = false;
     resizeIn.value = "";
   } else {
     const asset = serverConfig.assets[idx];
@@ -453,7 +431,6 @@ backendSelectEl.addEventListener("change", async () => {
     autoSmoothCb.checked = opts.autoSmooth !== false;
     creaseAngleIn.value =
       opts.creaseAngle !== undefined ? opts.creaseAngle : 30;
-    exportCompressionCb.checked = !!opts.compression;
     resizeIn.value = opts.resize !== undefined ? opts.resize : "";
 
     // Automatically load the content
@@ -475,7 +452,6 @@ backendSelectEl.addEventListener("change", async () => {
   }
 
   syncSmoothState();
-  syncCompressionState();
 });
 
 // Bundle parameters from the new UI explicitly for scad.config.json
@@ -484,7 +460,6 @@ function getBackendOptions() {
     binary: exportBinaryCb.checked,
     autoSmooth: autoSmoothCb.checked,
     creaseAngle: parseFloat(creaseAngleIn.value) || 30,
-    compression: exportCompressionCb.checked,
   };
 
   const resizeVal = parseFloat(resizeIn.value);
@@ -685,10 +660,6 @@ function rebuildSceneFromGLTF(gltfData) {
       currentMesh = null;
     }
 
-    const loader = new GLTFLoader();
-    // Allow decoding meshopt buffers exported by our gltf-transform implementation
-    loader.setMeshoptDecoder(MeshoptDecoder);
-
     // Parse the data directly
     let parseData = gltfData;
     if (gltfData instanceof Uint8Array) {
@@ -699,7 +670,7 @@ function rebuildSceneFromGLTF(gltfData) {
       );
     }
 
-    loader.parse(
+    new GLTFLoader().parse(
       parseData,
       "",
       (gltf) => {
