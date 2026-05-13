@@ -8,7 +8,7 @@ A modern, web-based editor and 3D viewer for OpenSCAD. It natively compiles `.sc
 
 ## ✨ Features
 
-- **100% Client-Side Compilation**: Compiles OpenSCAD scripts directly to `.glb` (binary) or `.gltf` (JSON) formats entirely in the browser using [`openscad-gltf-wasm`](https://github.com/iliagrigorevdev/openscad-gltf-wasm). No backend server is required.
+- **100% Client-Side Compilation**: Compiles OpenSCAD scripts directly to `.glb` (binary) format entirely in the browser using [`openscad-gltf-wasm`](https://github.com/iliagrigorevdev/openscad-gltf-wasm). No backend server is required.
 - **Photorealistic GPU Path Tracing**: Toggle on **Path Tracing** for incredibly realistic lighting, soft shadows, and physically accurate glass refractions/transmissions powered by `three-gpu-pathtracer`.
 - **Extended PBR Support**: Visualize advanced material properties extending standard OpenSCAD, including `metalness`, `roughness`, `transmission` (glass), `clearcoat`, `sheen`, `ior`, `emissive`, `specular`, and `iridescence`.
 - **Skeletal Animations**: Fully supports parsing and playing hierarchical bone animations defined in the custom SCAD engine.
@@ -16,7 +16,7 @@ A modern, web-based editor and 3D viewer for OpenSCAD. It natively compiles `.sc
 - **Compressed URL Sharing**: Share your designs instantly without a database. The app uses the native `CompressionStream` API to deflate your SCAD code and embed it into the URL hash, making even complex models shareable via a single link.
 - **Drag-and-Drop Support**: Instantly load existing scripts by dragging and dropping any `.scad` file directly into the browser window.
 - **AI Prompt Generator**: Because LLMs don't know about this engine's custom syntax, the viewer includes a built-in tool to generate AI-ready prompts. Customise the required PBR/Animation rules, describe your object, copy the prompt, and paste it into Gemini or Claude to get perfectly compatible SCAD code!
-- **Instant Export & Image Capture**: Download your `.scad` source code, export the resulting standard `.glb` or `.gltf` file (which automatically bakes in your smoothed geometry and animations), or instantly save a `.png` screenshot of your current render viewport.
+- **Instant Export & Image Capture**: Download your `.scad` source code, export the resulting standard `.glb` file (which automatically bakes in your smoothed geometry and animations), or instantly save a `.png` screenshot of your current render viewport.
 
 ## 🎮 How to Use
 
@@ -32,9 +32,8 @@ A modern, web-based editor and 3D viewer for OpenSCAD. It natively compiles `.sc
 
 - **Load & Drag-and-Drop**: Click the **📁 Load** button to open a file dialog, or drag a `.scad` file from your computer and drop it anywhere on the app to instantly load its contents into the editor and trigger a render.
 - Toggle **Auto Render** to automatically compile and update the 3D viewer when you stop typing (debounced at 800ms). Enabled by default. (Note: If the editor is empty, it will fall back to a default sample scene).
-- Toggle **Binary GLTF** to switch the WebAssembly compilation and export format between a binary `.glb` file (checked) and a plain text JSON `.gltf` file (unchecked).
 - You can manually trigger a render using the **▶ Render** button.
-- Use **⬇ SCAD** or **⬇ GLTF** to download your work. _(Note: The GLTF export respects the "Binary GLTF" toggle. Additionally, if "Auto Smooth" is enabled, the `.glb`/`.gltf` export will preserve the computed smooth vertex normals!)_
+- Use **⬇ SCAD** or **⬇ GLTF** to download your work. _(Note: If "Auto Smooth" is enabled, the `.glb` export will preserve the computed smooth vertex normals!)_
 - Click **🔗 Share** to generate a permanent link to your current script. On mobile devices, this opens the native share sheet; on desktop, it copies the link to your clipboard. Since the data is stored in the URL hash, your code is never sent to a server.
 - Use **📷 Image** to capture and download a high-quality `.png` screenshot of the 3D viewport.
 

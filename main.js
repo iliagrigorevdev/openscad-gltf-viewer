@@ -24,7 +24,6 @@ const autoRenderCb = document.getElementById("auto-render-cb");
 const autoSmoothCb = document.getElementById("auto-smooth-cb");
 const creaseAngleIn = document.getElementById("crease-angle-in");
 const pathTracingCb = document.getElementById("path-tracing-cb");
-const exportBinaryCb = document.getElementById("export-binary-cb");
 const resizeIn = document.getElementById("resize-in");
 const statusEl = document.getElementById("status");
 const viewerEl = document.getElementById("viewer");
@@ -112,14 +111,12 @@ async function compileAndRender(scadCode) {
   statusEl.innerText = "Compiling & Processing...";
 
   try {
-    const isBinary = exportBinaryCb.checked;
-
     let creaseDeg = parseFloat(creaseAngleIn.value);
     if (isNaN(creaseDeg)) creaseDeg = 30;
 
     const opts = {
       wasmUrl: wasmUrl,
-      binary: isBinary,
+
       autoSmooth: autoSmoothCb.checked,
       creaseAngle: creaseDeg,
     };
@@ -167,10 +164,6 @@ autoRenderCb.addEventListener("change", () => {
   if (autoRenderCb.checked) compileAndRender(editorEl.value || defaultScad);
 });
 
-exportBinaryCb.addEventListener("change", () => {
-  if (autoRenderCb.checked) compileAndRender(editorEl.value || defaultScad);
-});
-
 loadScadBtn.onclick = () => {
   const input = document.createElement("input");
   input.type = "file";
@@ -196,7 +189,7 @@ downloadScadBtn.onclick = () => {
 
 exportGltfBtn.onclick = () => {
   if (!currentGltfData) return;
-  const isBinary = exportBinaryCb.checked;
+
   const ext = isBinary ? "glb" : "gltf";
   const type = isBinary ? "application/octet-stream" : "text/plain";
   downloadBlob(new Blob([currentGltfData], { type }), `model.${ext}`);
@@ -415,7 +408,7 @@ backendSelectEl.addEventListener("change", async () => {
     backendInputEl.style.display = "block";
 
     // Reset configuration options to default
-    exportBinaryCb.checked = true;
+
     autoSmoothCb.checked = true;
     creaseAngleIn.value = "30";
     resizeIn.value = "";
@@ -427,7 +420,7 @@ backendSelectEl.addEventListener("change", async () => {
 
     // Fill custom parameter config
     const opts = asset.options || {};
-    exportBinaryCb.checked = opts.binary !== false;
+
     autoSmoothCb.checked = opts.autoSmooth !== false;
     creaseAngleIn.value =
       opts.creaseAngle !== undefined ? opts.creaseAngle : 30;
@@ -457,7 +450,6 @@ backendSelectEl.addEventListener("change", async () => {
 // Bundle parameters from the new UI explicitly for scad.config.json
 function getBackendOptions() {
   const opts = {
-    binary: exportBinaryCb.checked,
     autoSmooth: autoSmoothCb.checked,
     creaseAngle: parseFloat(creaseAngleIn.value) || 30,
   };
