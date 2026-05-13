@@ -33,8 +33,12 @@ const backendConnectBtn = document.getElementById("backend-connect-btn");
 const backendUiEl = document.getElementById("backend-ui");
 const backendSelectEl = document.getElementById("backend-select");
 const backendInputEl = document.getElementById("backend-input");
-
 const backendSingleSaveBtn = document.getElementById("backend-single-save-btn");
+
+const animControlsSection = document.getElementById("anim-controls-section");
+const animPlayBtn = document.getElementById("anim-play-btn");
+const animSelect = document.getElementById("anim-select");
+const animSlider = document.getElementById("anim-slider");
 
 let currentSelectedModelIdx = ""; // Track current selection for unsaved changes confirmation
 let currentMesh = null;
@@ -52,6 +56,11 @@ let currentModelOriginalState = {
   options: { autoSmooth: true, creaseAngle: 30 },
   content: "",
 };
+
+// Animation State
+let currentAction = null;
+let isPlaying = true;
+let isDraggingSlider = false;
 
 // Helper to determine what to render
 function getEditorContent() {
@@ -751,6 +760,69 @@ scene.add(floor);
 
 pathTracer.setScene(scene, camera);
 
+// --- Animation Controls ---
+function playAnimation(index) {
+  if (!mixer || !currentAnimations[index]) return;
+  if (currentAction) {
+    currentAction.stop();
+  }
+  const clip = currentAnimations[index];
+  currentAction = mixer.clipAction(clip);
+  currentAction.play();
+  isPlaying = true;
+  currentAction.paused = false;
+  animPlayBtn.innerText = "⏸ Pause";
+  animSlider.value = 0;
+  if (statusEl)
+    statusEl.innerText = `Playing: ${clip.name || `Animation ${index + 1}`}`;
+}
+
+animSelect.addEventListener("change", (e) => {
+  playAnimation(parseInt(e.target.value));
+});
+
+animPlayBtn.addEventListener("click", () => {
+  if (!currentAction) return;
+  isPlaying = !isPlaying;
+  currentAction.paused = !isPlaying;
+  animPlayBtn.innerText = isPlaying ? "⏸ Pause" : "▶ Play";
+});
+
+animSlider.addEventListener("mousedown", () => {
+  isDraggingSlider = true;
+});
+animSlider.addEventListener("mouseup", () => {
+  isDraggingSlider = false;
+});
+animSlider.addEventListener(
+  "touchstart",
+  () => {
+    isDraggingSlider = true;
+  },
+  { passive: true },
+);
+animSlider.addEventListener(
+  "touchend",
+  () => {
+    isDraggingSlider = false;
+  },
+  { passive: true },
+);
+
+animSlider.addEventListener("input", (e) => {
+  if (currentAction) {
+    const duration = currentAction.getClip().duration;
+    currentAction.time = parseFloat(e.target.value) * duration;
+    // Force mixer to update to the new manual scrub time
+    if (mixer) {
+      mixer.update(0);
+      if (pathTracingCb.checked && pathTracer) {
+        pathTracer.setScene(scene, camera);
+      }
+    }
+  }
+});
+
 // --- GLTF Parsing & Rendering Logic ---
 function clearCurrentMesh() {
   if (currentMesh) {
@@ -759,6 +831,7 @@ function clearCurrentMesh() {
       mixer.uncacheRoot(mixer.getRoot());
       mixer = null;
     }
+    currentAction = null;
     scene.remove(currentMesh);
     currentMesh.traverse((child) => {
       if (child.isMesh) {
@@ -797,26 +870,18 @@ function rebuildSceneFromGLTF(gltfData) {
 
         if (currentAnimations.length) {
           mixer = new THREE.AnimationMixer(currentMesh);
-          if (currentAnimations.length === 1) {
-            mixer.clipAction(currentAnimations[0]).play();
-          } else {
-            let currentAnimIndex = 0;
-            const playAnimationSequence = (index) => {
-              const clip = currentAnimations[index];
-              const action = mixer.clipAction(clip);
-              action.reset();
-              action.setLoop(THREE.LoopOnce);
-              action.clampWhenFinished = true;
-              action.play();
-              if (statusEl) statusEl.innerText = `Playing: ${clip.name}`;
-            };
-            mixer.addEventListener("finished", () => {
-              currentAnimIndex =
-                (currentAnimIndex + 1) % currentAnimations.length;
-              playAnimationSequence(currentAnimIndex);
-            });
-            playAnimationSequence(currentAnimIndex);
-          }
+          animControlsSection.style.display = "flex";
+          animSelect.innerHTML = "";
+          currentAnimations.forEach((clip, i) => {
+            const opt = document.createElement("option");
+            opt.value = i;
+            opt.innerText = clip.name || `Animation ${i + 1}`;
+            animSelect.appendChild(opt);
+          });
+          playAnimation(0);
+        } else {
+          animControlsSection.style.display = "none";
+          currentAction = null;
         }
 
         // The bridge handled the smoothing. We only set up shadows.
@@ -891,7 +956,20 @@ function animate() {
   const delta = (now - lastTime) / 1000;
   lastTime = now;
 
-  if (mixer && !pathTracingCb.checked) mixer.update(delta);
+  if (mixer && !pathTracingCb.checked) {
+    mixer.update(delta);
+
+    // Sync UI Slider with current Animation progress
+    if (currentAction && isPlaying && !isDraggingSlider) {
+      const duration = currentAction.getClip().duration;
+      if (duration > 0) {
+        let currentClipTime = currentAction.time % duration;
+        if (currentClipTime < 0) currentClipTime += duration;
+        animSlider.value = currentClipTime / duration;
+      }
+    }
+  }
+
   controls.update();
 
   if (pathTracingCb.checked) {
