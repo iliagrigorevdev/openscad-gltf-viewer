@@ -45,12 +45,22 @@ let pendingCode = null;
 let mixer = null;
 let captureNextFrame = false;
 
-// Track the baseline state loaded from the server to compute changes
+// Track connection and state
+let isServerConnected = false;
 let currentModelOriginalState = {
   isNew: true,
   options: { autoSmooth: true, creaseAngle: 30 },
   content: "",
 };
+
+// Helper to determine what to render
+function getEditorContent() {
+  if (isServerConnected) {
+    return editorEl.value; // Allow true empty state
+  }
+  // Fallback to default SCAD only when disconnected
+  return editorEl.value || defaultScad;
+}
 
 function syncSmoothState() {
   creaseAngleIn.disabled = !autoSmoothCb.checked;
@@ -66,13 +76,13 @@ pathTracingCb.addEventListener("change", () => {
 autoSmoothCb.addEventListener("change", () => {
   syncSmoothState();
   checkChanges();
-  compileAndRender(editorEl.value || defaultScad);
+  compileAndRender(getEditorContent());
 });
 
 creaseAngleIn.addEventListener("change", () => {
   checkChanges();
   if (autoSmoothCb.checked) {
-    compileAndRender(editorEl.value || defaultScad);
+    compileAndRender(getEditorContent());
   }
 });
 creaseAngleIn.addEventListener("input", checkChanges);
@@ -108,9 +118,16 @@ copyPromptBtn.onclick = async () => {
 
 // --- SCAD Compilation ---
 async function compileAndRender(scadCode) {
-  if (!scadCode) return;
+  if (typeof scadCode !== "string") return;
   if (isCompiling) {
     pendingCode = scadCode;
+    return;
+  }
+
+  // Handle empty models natively to clear the 3D viewer
+  if (scadCode.trim() === "") {
+    clearCurrentMesh();
+    statusEl.innerText = "Waiting for code...";
     return;
   }
 
@@ -146,10 +163,10 @@ async function compileAndRender(scadCode) {
   }
 }
 
-renderBtn.onclick = () => compileAndRender(editorEl.value || defaultScad);
+renderBtn.onclick = () => compileAndRender(getEditorContent());
 
 let renderTimeout;
-editorEl.addEventListener("input", (e) => {
+editorEl.addEventListener("input", () => {
   checkChanges();
   clearTimeout(renderTimeout);
   if (!autoRenderCb.checked) {
@@ -158,12 +175,12 @@ editorEl.addEventListener("input", (e) => {
   }
   statusEl.innerText = "Waiting to compile...";
   renderTimeout = setTimeout(() => {
-    compileAndRender(e.target.value || defaultScad);
+    compileAndRender(getEditorContent());
   }, 800);
 });
 
 autoRenderCb.addEventListener("change", () => {
-  if (autoRenderCb.checked) compileAndRender(editorEl.value || defaultScad);
+  if (autoRenderCb.checked) compileAndRender(getEditorContent());
 });
 
 loadScadBtn.onclick = () => {
@@ -186,7 +203,7 @@ loadScadBtn.onclick = () => {
 };
 
 downloadScadBtn.onclick = () => {
-  const codeToSave = editorEl.value || defaultScad;
+  const codeToSave = getEditorContent();
   downloadBlob(new Blob([codeToSave], { type: "text/plain" }), "model.scad");
 };
 
@@ -270,7 +287,7 @@ shareBtn.onclick = async () => {
   const url = new URL(window.location.href);
   let finalUrl = "";
 
-  if (!code || code === defaultScad.trim()) {
+  if (!code || (!isServerConnected && code === defaultScad.trim())) {
     finalUrl = url.origin + url.pathname + url.search;
   } else {
     try {
@@ -425,7 +442,7 @@ function checkChanges() {
   const isNew = backendSelectEl.value === "";
   const input = getSanitizedNames().input;
   const currentOptions = getBackendOptions();
-  const currentContent = editorEl.value || defaultScad;
+  const currentContent = editorEl.value; // Server comparison should evaluate text directly
 
   let scadChanged = false;
   let configChanged = false;
@@ -475,22 +492,33 @@ backendConnectBtn.onclick = async () => {
     backendConnectBtn.innerText = "Connecting...";
     serverConfig = await fetchBackendConfig(url);
     currentBackendUrl = url;
+    isServerConnected = true;
+
     backendConnectBtn.innerText = "Connected";
     backendUiEl.classList.add("active");
+
+    // Clear placeholder when connected
+    editorEl.placeholder = "";
 
     currentSelectedModelIdx = ""; // Reset on new connection
     renderBackendSelect();
 
+    // Enforce empty editor behavior for new models on connection
+    editorEl.value = "";
+    compileAndRender(getEditorContent());
+
     currentModelOriginalState = {
       isNew: true,
       options: getBackendOptions(),
-      content: editorEl.value || defaultScad,
+      content: "",
     };
     checkChanges();
   } catch (err) {
     alert("Connection failed: " + err.message);
     backendConnectBtn.innerText = "Connect";
     backendUiEl.classList.remove("active");
+    isServerConnected = false;
+    editorEl.placeholder = defaultScad; // Restore fallback placeholder
   }
 };
 
@@ -517,14 +545,17 @@ backendSelectEl.addEventListener("change", async () => {
     backendInputEl.style.display = "block";
 
     // Reset configuration options to default
-
     autoSmoothCb.checked = true;
     creaseAngleIn.value = "30";
+
+    // Enforce empty editor behavior for new models
+    editorEl.value = "";
+    compileAndRender(getEditorContent());
 
     currentModelOriginalState = {
       isNew: true,
       options: { autoSmooth: true, creaseAngle: 30 },
-      content: editorEl.value || defaultScad,
+      content: "",
     };
     checkChanges();
   } else {
@@ -552,7 +583,7 @@ backendSelectEl.addEventListener("change", async () => {
       }
       const data = await res.json();
       editorEl.value = data.content;
-      compileAndRender(data.content);
+      compileAndRender(getEditorContent());
 
       currentModelOriginalState = {
         isNew: false,
@@ -586,7 +617,7 @@ backendSingleSaveBtn.onclick = async () => {
   let method = "POST";
   if (scadChanged || isNew) {
     method = "POST";
-    payload.content = editorEl.value || defaultScad;
+    payload.content = editorEl.value;
   } else {
     method = "PATCH";
   }
@@ -623,7 +654,7 @@ backendSingleSaveBtn.onclick = async () => {
     currentModelOriginalState = {
       isNew: false,
       options: getBackendOptions(),
-      content: editorEl.value || defaultScad,
+      content: editorEl.value,
     };
     checkChanges();
   } catch (err) {
@@ -704,27 +735,31 @@ scene.add(floor);
 pathTracer.setScene(scene, camera);
 
 // --- GLTF Parsing & Rendering Logic ---
+function clearCurrentMesh() {
+  if (currentMesh) {
+    if (mixer) {
+      mixer.stopAllAction();
+      mixer.uncacheRoot(mixer.getRoot());
+      mixer = null;
+    }
+    scene.remove(currentMesh);
+    currentMesh.traverse((child) => {
+      if (child.isMesh) {
+        child.geometry.dispose();
+        if (Array.isArray(child.material)) {
+          child.material.forEach((m) => m.dispose());
+        } else if (child.material) {
+          child.material.dispose();
+        }
+      }
+    });
+    currentMesh = null;
+  }
+}
+
 function rebuildSceneFromGLTF(gltfData) {
   return new Promise((resolve, reject) => {
-    if (currentMesh) {
-      if (mixer) {
-        mixer.stopAllAction();
-        mixer.uncacheRoot(mixer.getRoot());
-        mixer = null;
-      }
-      scene.remove(currentMesh);
-      currentMesh.traverse((child) => {
-        if (child.isMesh) {
-          child.geometry.dispose();
-          if (Array.isArray(child.material)) {
-            child.material.forEach((m) => m.dispose());
-          } else if (child.material) {
-            child.material.dispose();
-          }
-        }
-      });
-      currentMesh = null;
-    }
+    clearCurrentMesh();
 
     // Parse the data directly
     let parseData = gltfData;
@@ -886,9 +921,6 @@ editorEl.placeholder = defaultScad;
     }
   }
 
-  if (!editorEl.value.trim()) {
-    setTimeout(() => compileAndRender(defaultScad), 500);
-  } else {
-    setTimeout(() => compileAndRender(editorEl.value), 500);
-  }
+  // Initial render utilizes the fallback system
+  setTimeout(() => compileAndRender(getEditorContent()), 500);
 })();
