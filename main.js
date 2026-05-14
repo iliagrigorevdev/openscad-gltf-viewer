@@ -21,8 +21,6 @@ const exportGltfBtn = document.getElementById("export-gltf-btn");
 const captureImageBtn = document.getElementById("capture-image-btn");
 const shareBtn = document.getElementById("share-btn");
 const autoRenderCb = document.getElementById("auto-render-cb");
-const autoSmoothCb = document.getElementById("auto-smooth-cb");
-const creaseAngleIn = document.getElementById("crease-angle-in");
 const pathTracingCb = document.getElementById("path-tracing-cb");
 
 const statusEl = document.getElementById("status");
@@ -53,7 +51,7 @@ let captureNextFrame = false;
 let isServerConnected = false;
 let currentModelOriginalState = {
   isNew: true,
-  options: { autoSmooth: true, creaseAngle: 30 },
+  options: {},
   content: "",
 };
 
@@ -71,30 +69,12 @@ function getEditorContent() {
   return editorEl.value || defaultScad;
 }
 
-function syncSmoothState() {
-  creaseAngleIn.disabled = !autoSmoothCb.checked;
-}
-
 pathTracingCb.addEventListener("change", () => {
   if (pathTracingCb.checked && pathTracer) {
     pathTracer.setScene(scene, camera);
   }
 });
 
-// Force a re-compile if Auto Smooth changes
-autoSmoothCb.addEventListener("change", () => {
-  syncSmoothState();
-  checkChanges();
-  compileAndRender(getEditorContent());
-});
-
-creaseAngleIn.addEventListener("change", () => {
-  checkChanges();
-  if (autoSmoothCb.checked) {
-    compileAndRender(getEditorContent());
-  }
-});
-creaseAngleIn.addEventListener("input", checkChanges);
 backendInputEl.addEventListener("input", checkChanges);
 
 // --- Prompt Logic ---
@@ -145,13 +125,8 @@ async function compileAndRender(scadCode) {
   statusEl.innerText = "Compiling & Processing...";
 
   try {
-    let creaseDeg = parseFloat(creaseAngleIn.value);
-    if (isNaN(creaseDeg)) creaseDeg = 30;
-
     const opts = {
       wasmUrl: wasmUrl,
-      autoSmooth: autoSmoothCb.checked,
-      creaseAngle: creaseDeg,
     };
 
     // Call the newly created Bridge library
@@ -417,12 +392,7 @@ function renderBackendSelect() {
 
 // Bundle parameters from the new UI explicitly for scad.config.json
 function getBackendOptions() {
-  const opts = {
-    autoSmooth: autoSmoothCb.checked,
-    creaseAngle: parseFloat(creaseAngleIn.value) || 30,
-  };
-
-  return opts;
+  return {};
 }
 
 // Helper to grab and clean up names from the inputs or dropdown
@@ -467,10 +437,8 @@ function checkChanges() {
       scadChanged = true;
     }
     if (
-      currentOptions.autoSmooth !==
-        currentModelOriginalState.options.autoSmooth ||
-      currentOptions.creaseAngle !==
-        currentModelOriginalState.options.creaseAngle
+      JSON.stringify(currentOptions) !==
+      JSON.stringify(currentModelOriginalState.options)
     ) {
       configChanged = true;
     }
@@ -571,17 +539,13 @@ backendSelectEl.addEventListener("change", async () => {
     backendInputEl.value = "";
     backendInputEl.style.display = "block";
 
-    // Reset configuration options to default
-    autoSmoothCb.checked = true;
-    creaseAngleIn.value = "30";
-
     // Enforce empty editor behavior for new models
     editorEl.value = "";
     compileAndRender(getEditorContent());
 
     currentModelOriginalState = {
       isNew: true,
-      options: { autoSmooth: true, creaseAngle: 30 },
+      options: {},
       content: "",
     };
     checkChanges();
@@ -590,13 +554,6 @@ backendSelectEl.addEventListener("change", async () => {
     const input = asset.input;
     backendInputEl.value = input || "";
     backendInputEl.style.display = "none";
-
-    // Fill custom parameter config
-    const opts = asset.options || {};
-
-    autoSmoothCb.checked = opts.autoSmooth !== false;
-    creaseAngleIn.value =
-      opts.creaseAngle !== undefined ? opts.creaseAngle : 30;
 
     // Automatically load the content
     try {
@@ -614,10 +571,7 @@ backendSelectEl.addEventListener("change", async () => {
 
       currentModelOriginalState = {
         isNew: false,
-        options: {
-          autoSmooth: autoSmoothCb.checked,
-          creaseAngle: parseFloat(creaseAngleIn.value) || 30,
-        },
+        options: {},
         content: data.content,
       };
       checkChanges();
@@ -625,8 +579,6 @@ backendSelectEl.addEventListener("change", async () => {
       alert("Error loading model: " + err.message);
     }
   }
-
-  syncSmoothState();
 });
 
 backendSingleSaveBtn.onclick = async () => {
