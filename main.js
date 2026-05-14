@@ -108,6 +108,7 @@ copyPromptBtn.onclick = async () => {
     emissive: document.getElementById("opt-pbr-emissive").checked,
     specular: document.getElementById("opt-pbr-specular").checked,
     iridescence: document.getElementById("opt-pbr-iridescence").checked,
+    autoSmoothAngle: document.getElementById("opt-pbr-autosmooth").checked,
     animation: document.getElementById("opt-anim").checked,
   };
 
