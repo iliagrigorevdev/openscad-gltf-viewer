@@ -366,23 +366,24 @@ window.addEventListener("drop", async (e) => {
 });
 
 // --- Backend Integration ---
-let serverConfig = null;
+let serverFiles = null;
 let currentBackendUrl = "";
 
-async function fetchBackendConfig(url) {
-  const res = await fetch(`${url}/api/config`);
-  if (!res.ok) throw new Error("Failed to fetch config");
-  return await res.json();
+async function fetchBackendFiles(url) {
+  const res = await fetch(`${url}/api/scads`);
+  if (!res.ok) throw new Error("Failed to fetch files");
+  const data = await res.json();
+  return data.files;
 }
 
 function renderBackendSelect() {
   backendSelectEl.innerHTML =
     '<option value="">-- Create New Model --</option>';
-  if (serverConfig && Array.isArray(serverConfig.assets)) {
-    serverConfig.assets.forEach((asset, index) => {
+  if (Array.isArray(serverFiles)) {
+    serverFiles.forEach((filename, index) => {
       const opt = document.createElement("option");
       opt.value = index;
-      opt.innerText = asset.input;
+      opt.innerText = filename;
       backendSelectEl.appendChild(opt);
     });
   }
@@ -390,74 +391,50 @@ function renderBackendSelect() {
   backendSelectEl.value = currentSelectedModelIdx;
 }
 
-// Bundle parameters from the new UI explicitly for scad.config.json
-function getBackendOptions() {
-  return {};
-}
-
 // Helper to grab and clean up names from the inputs or dropdown
 function getSanitizedNames() {
-  let input = "";
+  let filename = "";
   const idx = backendSelectEl.value;
 
   if (idx === "") {
-    input = backendInputEl.value.trim();
+    filename = backendInputEl.value.trim();
   } else {
-    input = serverConfig.assets[idx].input;
+    filename = serverFiles[idx];
   }
 
-  if (input)
-    input = input
-      .replace(/\.scad$/i, "")
-      .split(/[/\\]/)
-      .pop();
+  if (filename)
+    filename =
+      filename
+        .replace(/\.scad$/i, "")
+        .split(/[/\\]/)
+        .pop() + ".scad";
 
-  return { input };
+  return { filename };
 }
 
 // Detect and dynamically expose Save Button variations
 function checkChanges() {
-  if (!serverConfig) return;
+  if (serverFiles === null) return;
 
   const isNew = backendSelectEl.value === "";
-  const input = getSanitizedNames().input;
-  const currentOptions = getBackendOptions();
+  const { filename } = getSanitizedNames();
   const currentContent = editorEl.value; // Server comparison should evaluate text directly
 
   let scadChanged = false;
-  let configChanged = false;
 
   if (isNew) {
-    if (input) {
+    if (filename && filename !== ".scad") {
       scadChanged = true;
-      configChanged = true;
     }
   } else {
     if (currentContent !== currentModelOriginalState.content) {
       scadChanged = true;
     }
-    if (
-      JSON.stringify(currentOptions) !==
-      JSON.stringify(currentModelOriginalState.options)
-    ) {
-      configChanged = true;
-    }
   }
 
-  const hasChanges = scadChanged || configChanged;
-
-  if (hasChanges) {
+  if (scadChanged) {
     backendSingleSaveBtn.style.display = "flex";
-    backendSingleSaveBtn.dataset.scadChanged = scadChanged.toString();
-    backendSingleSaveBtn.dataset.configChanged = configChanged.toString();
-
-    if (scadChanged && configChanged) {
-      backendSingleSaveBtn.innerText = "Save All";
-    } else if (scadChanged) {
-      backendSingleSaveBtn.innerText = "Save SCAD";
-    } else if (configChanged) {
-      backendSingleSaveBtn.innerText = "Save Config";
-    }
+    backendSingleSaveBtn.innerText = "Save";
   } else {
     backendSingleSaveBtn.style.display = "none";
   }
@@ -467,7 +444,7 @@ async function connectToServer(url, isAutoConnect = false) {
   if (!url) return false;
   try {
     backendConnectBtn.innerText = "Connecting...";
-    serverConfig = await fetchBackendConfig(url);
+    serverFiles = await fetchBackendFiles(url);
     currentBackendUrl = url;
     isServerConnected = true;
 
@@ -488,7 +465,6 @@ async function connectToServer(url, isAutoConnect = false) {
 
     currentModelOriginalState = {
       isNew: true,
-      options: getBackendOptions(),
       content: "",
     };
     checkChanges();
@@ -545,21 +521,19 @@ backendSelectEl.addEventListener("change", async () => {
 
     currentModelOriginalState = {
       isNew: true,
-      options: {},
       content: "",
     };
     checkChanges();
   } else {
-    const asset = serverConfig.assets[idx];
-    const input = asset.input;
-    backendInputEl.value = input || "";
+    const filename = serverFiles[idx];
+    backendInputEl.value = filename.replace(/\.scad$/i, "");
     backendInputEl.style.display = "none";
 
     // Automatically load the content
     try {
       statusEl.innerText = "Loading from server...";
       const res = await fetch(
-        `${currentBackendUrl}/api/models?input=${encodeURIComponent(input)}`,
+        `${currentBackendUrl}/api/scads/${encodeURIComponent(filename)}`,
       );
       if (!res.ok) {
         const errData = await res.json();
@@ -571,7 +545,6 @@ backendSelectEl.addEventListener("change", async () => {
 
       currentModelOriginalState = {
         isNew: false,
-        options: {},
         content: data.content,
       };
       checkChanges();
@@ -582,29 +555,18 @@ backendSelectEl.addEventListener("change", async () => {
 });
 
 backendSingleSaveBtn.onclick = async () => {
-  const { input } = getSanitizedNames();
-  if (!input) return alert("Input name is required.");
-
-  const scadChanged = backendSingleSaveBtn.dataset.scadChanged === "true";
-  const isNew = backendSelectEl.value === "";
+  const { filename } = getSanitizedNames();
+  if (!filename || filename === ".scad") return alert("Filename is required.");
 
   const payload = {
-    input,
-    options: getBackendOptions(),
+    filename,
+    content: editorEl.value,
   };
-
-  let method = "POST";
-  if (scadChanged || isNew) {
-    method = "POST";
-    payload.content = editorEl.value;
-  } else {
-    method = "PATCH";
-  }
 
   try {
     backendSingleSaveBtn.innerText = "Saving...";
-    const res = await fetch(`${currentBackendUrl}/api/models`, {
-      method,
+    const res = await fetch(`${currentBackendUrl}/api/scads`, {
+      method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
@@ -614,10 +576,10 @@ backendSingleSaveBtn.onclick = async () => {
       throw new Error(errData.error || "Save failed");
     }
 
-    serverConfig = await fetchBackendConfig(currentBackendUrl);
+    serverFiles = await fetchBackendFiles(currentBackendUrl);
 
     // Track newly saved index prior to re-rendering so it is correctly loaded into UI
-    const newIdx = serverConfig.assets.findIndex((a) => a.input === input);
+    const newIdx = serverFiles.findIndex((f) => f === filename);
     if (newIdx >= 0) {
       currentSelectedModelIdx = newIdx.toString();
     } else {
@@ -632,7 +594,6 @@ backendSingleSaveBtn.onclick = async () => {
 
     currentModelOriginalState = {
       isNew: false,
-      options: getBackendOptions(),
       content: editorEl.value,
     };
     checkChanges();

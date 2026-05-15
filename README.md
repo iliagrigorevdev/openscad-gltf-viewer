@@ -13,7 +13,7 @@ A modern, web-based editor and 3D viewer for OpenSCAD. It natively compiles `.sc
 - **Extended PBR Support**: Visualize advanced material properties extending standard OpenSCAD, including `metalness`, `roughness`, `transmission` (glass), `clearcoat`, `sheen`, `ior`, `emissive`, `specular`, and `iridescence`.
 - **Skeletal Animations**: Fully supports parsing and playing hierarchical bone animations defined in the custom SCAD engine, complete with timeline playback controls.
 - **Auto Smooth & Crease Angle**: Toggle on **Auto Smooth** to automatically calculate and apply smooth vertex normals to blocky CAD geometry. Fine-tune the **Crease Angle** to perfectly preserve intended sharp edges.
-- **Local File Sync (SCAD Serve)**: Connect the web viewer to the local filesystem using the `openscad-gltf-bridge` CLI. Instantly manage, edit, and save `.scad` files and their export configurations (`scad.config.json`) directly from your browser.
+- **Local File Sync (SCAD Serve)**: Connect the web viewer to the local filesystem using the `openscad-gltf-wasm` CLI. Instantly manage, edit, and save `.scad` files directly from your browser.
 - **Compressed URL Sharing**: Share your designs instantly without a database. The app uses the native `CompressionStream` API to deflate your SCAD code and embed it into the URL hash, making even complex models shareable via a single link.
 - **Drag-and-Drop Support**: Instantly load existing scripts by dragging and dropping any `.scad` file directly into the browser window.
 - **AI Prompt Generator**: Because LLMs don't know about this engine's custom syntax, the viewer includes a built-in tool to generate AI-ready prompts. Customise the required PBR/Animation rules, describe your object, copy the prompt, and paste it into Gemini or Claude to get perfectly compatible SCAD code!
@@ -47,16 +47,16 @@ A modern, web-based editor and 3D viewer for OpenSCAD. It natively compiles `.sc
 
 ### 4. Local File Sync (SCAD Serve Backend)
 
-The viewer can connect to a local development environment to save files directly to your hard drive and manage a build pipeline using the [`openscad-gltf-bridge`](https://github.com/iliagrigorevdev/openscad-gltf-bridge) CLI.
+The viewer can connect to a local development environment to save files directly to your hard drive and manage files using the [`openscad-gltf-wasm`](https://github.com/iliagrigorevdev/openscad-gltf-wasm) CLI.
 
 **1. Start the local backend server:**
 Run this in your project folder to bridge the web editor to your filesystem.
 
 - **Option A: Run directly (No installation)**
   ```bash
-  npx -p github:iliagrigorevdev/openscad-gltf-bridge scad-serve
+  npx -p github:iliagrigorevdev/openscad-gltf-wasm scad-serve
   ```
-- **Option B: If installed locally (`npm install --save-dev github:iliagrigorevdev/openscad-gltf-bridge`)**
+- **Option B: If installed locally (`npm install --save-dev github:iliagrigorevdev/openscad-gltf-wasm`)**
   ```bash
   npx scad-serve
   ```
@@ -65,19 +65,7 @@ Run this in your project folder to bridge the web editor to your filesystem.
 
 1. In the Web Viewer, ensure the Backend URL is correct and click **Connect**.
 2. Select `-- Create New Model --` to start a new file, or choose an existing model from the dropdown.
-3. The UI tracks unsaved changes. Use the **Save** buttons to update your `.scad` files and `scad.config.json` on your disk.
-
-**3. Batch Compilation:**
-Once your models are configured, you can batch-compile the entire project to `.glb` format (applying all Auto Smooth and Crease Angle settings) from your terminal:
-
-- **Option A: Run directly**
-  ```bash
-  npx -p github:iliagrigorevdev/openscad-gltf-bridge scad-build
-  ```
-- **Option B: If installed locally**
-  ```bash
-  npx scad-build
-  ```
+3. The UI tracks unsaved changes. Use the **Save** button to update your `.scad` files on your disk.
 
 ### 5. Viewer Controls
 
