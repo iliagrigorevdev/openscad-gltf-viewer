@@ -13,6 +13,7 @@ import defaultScad from "./default.scad?raw";
 // --- UI Elements ---
 const promptDescEl = document.getElementById("prompt-desc");
 const copyPromptBtn = document.getElementById("copy-prompt-btn");
+const modelNameInputEl = document.getElementById("model-name-input");
 const editorEl = document.getElementById("editor");
 const renderBtn = document.getElementById("render-btn");
 const loadScadBtn = document.getElementById("load-scad-btn");
@@ -31,7 +32,6 @@ const backendUrlEl = document.getElementById("backend-url");
 const backendConnectBtn = document.getElementById("backend-connect-btn");
 const backendUiEl = document.getElementById("backend-ui");
 const backendSelectEl = document.getElementById("backend-select");
-const backendInputEl = document.getElementById("backend-input");
 const backendSingleSaveBtn = document.getElementById("backend-single-save-btn");
 
 const animControlsSection = document.getElementById("anim-controls-section");
@@ -70,13 +70,17 @@ function getEditorContent() {
   return editorEl.value || defaultScad;
 }
 
+function getDownloadName() {
+  return modelNameInputEl.value.trim() || "model";
+}
+
 pathTracingCb.addEventListener("change", () => {
   if (pathTracingCb.checked && pathTracer) {
     pathTracer.setScene(scene, camera);
   }
 });
 
-backendInputEl.addEventListener("input", checkChanges);
+modelNameInputEl.addEventListener("input", checkChanges);
 
 // --- Prompt Logic ---
 copyPromptBtn.onclick = async () => {
@@ -189,14 +193,17 @@ loadScadBtn.onclick = () => {
 
 downloadScadBtn.onclick = () => {
   const codeToSave = getEditorContent();
-  downloadBlob(new Blob([codeToSave], { type: "text/plain" }), "model.scad");
+  downloadBlob(
+    new Blob([codeToSave], { type: "text/plain" }),
+    `${getDownloadName()}.scad`,
+  );
 };
 
 exportGltfBtn.onclick = () => {
   if (!currentGltfData) return;
   downloadBlob(
     new Blob([currentGltfData], { type: "application/octet-stream" }),
-    `model.glb`,
+    `${getDownloadName()}.glb`,
   );
 };
 
@@ -393,14 +400,7 @@ function renderBackendSelect() {
 
 // Helper to grab and clean up names from the inputs or dropdown
 function getSanitizedNames() {
-  let filename = "";
-  const idx = backendSelectEl.value;
-
-  if (idx === "") {
-    filename = backendInputEl.value.trim();
-  } else {
-    filename = serverFiles[idx];
-  }
+  let filename = modelNameInputEl.value.trim();
 
   if (filename)
     filename =
@@ -423,7 +423,7 @@ function checkChanges() {
   let scadChanged = false;
 
   if (isNew) {
-    if (filename && filename !== ".scad") {
+    if ((filename && filename !== ".scad") || currentContent.trim() !== "") {
       scadChanged = true;
     }
   } else {
@@ -452,7 +452,7 @@ async function connectToServer(url, isAutoConnect = false) {
     backendUiEl.classList.add("active");
 
     // Clear placeholder when connected
-    editorEl.placeholder = "";
+    editorEl.placeholder = "Enter OpenSCAD code here...";
 
     currentSelectedModelIdx = ""; // Reset on new connection
     renderBackendSelect();
@@ -512,8 +512,7 @@ backendSelectEl.addEventListener("change", async () => {
   currentSelectedModelIdx = idx;
 
   if (idx === "") {
-    backendInputEl.value = "";
-    backendInputEl.style.display = "block";
+    modelNameInputEl.value = "";
 
     // Enforce empty editor behavior for new models
     editorEl.value = "";
@@ -526,8 +525,7 @@ backendSelectEl.addEventListener("change", async () => {
     checkChanges();
   } else {
     const filename = serverFiles[idx];
-    backendInputEl.value = filename.replace(/\.scad$/i, "");
-    backendInputEl.style.display = "none";
+    modelNameInputEl.value = filename.replace(/\.scad$/i, "");
 
     // Automatically load the content
     try {
@@ -556,7 +554,18 @@ backendSelectEl.addEventListener("change", async () => {
 
 backendSingleSaveBtn.onclick = async () => {
   const { filename } = getSanitizedNames();
-  if (!filename || filename === ".scad") return alert("Filename is required.");
+
+  if (!filename || filename === ".scad") {
+    const originalText = backendSingleSaveBtn.innerText;
+    backendSingleSaveBtn.innerText = "⚠️ Name Required!";
+    backendSingleSaveBtn.style.borderColor = "#ff4444";
+    modelNameInputEl.focus();
+    setTimeout(() => {
+      backendSingleSaveBtn.innerText = originalText;
+      backendSingleSaveBtn.style.borderColor = "";
+    }, 2000);
+    return;
+  }
 
   const payload = {
     filename,
@@ -587,10 +596,6 @@ backendSingleSaveBtn.onclick = async () => {
     }
 
     renderBackendSelect();
-
-    if (newIdx >= 0) {
-      backendInputEl.style.display = "none";
-    }
 
     currentModelOriginalState = {
       isNew: false,
@@ -896,7 +901,7 @@ function animate() {
   if (captureNextFrame) {
     captureNextFrame = false;
     renderer.domElement.toBlob((blob) => {
-      if (blob) downloadBlob(blob, "render.png");
+      if (blob) downloadBlob(blob, `${getDownloadName()}.png`);
     }, "image/png");
   }
 }
