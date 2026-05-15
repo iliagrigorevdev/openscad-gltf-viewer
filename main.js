@@ -457,12 +457,6 @@ async function connectToServer(url, isAutoConnect = false) {
     currentSelectedModelIdx = ""; // Reset on new connection
     renderBackendSelect();
 
-    // Enforce empty editor behavior for new models, unless we're auto-connecting
-    // and there is already content (like code loaded from a URL hash).
-    if (!isAutoConnect || !editorEl.value.trim()) {
-      editorEl.value = "";
-    }
-
     currentModelOriginalState = {
       isNew: true,
       content: "",
