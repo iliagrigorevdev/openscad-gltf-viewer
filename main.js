@@ -1,6 +1,6 @@
 import { generatePrompt } from "openscad-gltf-wasm/prompt";
 import wasmUrl from "openscad-gltf-wasm/openscad.wasm?url";
-import { processScad } from "openscad-gltf-bridge";
+import { convertScadToGltf } from "openscad-gltf-wasm/convert";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
@@ -129,8 +129,7 @@ async function compileAndRender(scadCode) {
       wasmUrl: wasmUrl,
     };
 
-    // Call the newly created Bridge library
-    currentGltfData = await processScad(scadCode, opts);
+    currentGltfData = await convertScadToGltf(scadCode, opts);
 
     statusEl.innerText = "Building Scene...";
     await rebuildSceneFromGLTF(currentGltfData);
@@ -798,7 +797,6 @@ function rebuildSceneFromGLTF(gltfData) {
           currentAction = null;
         }
 
-        // The bridge handled the smoothing. We only set up shadows.
         currentMesh.traverse((child) => {
           if (child.isMesh) {
             child.castShadow = true;
