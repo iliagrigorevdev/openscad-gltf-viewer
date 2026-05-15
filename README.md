@@ -11,6 +11,7 @@ A modern, web-based editor and 3D viewer for OpenSCAD. It natively compiles `.sc
 - **100% Client-Side Compilation**: Compiles OpenSCAD scripts directly to `.glb` (binary) format entirely in the browser using [`openscad-gltf-wasm`](https://github.com/iliagrigorevdev/openscad-gltf-wasm) and WebAssembly.
 - **Photorealistic GPU Path Tracing**: Toggle on **Path Tracing** for incredibly realistic lighting, soft shadows, and physically accurate glass refractions/transmissions powered by `three-gpu-pathtracer`.
 - **Extended PBR Support**: Visualize advanced material properties extending standard OpenSCAD, including `metalness`, `roughness`, `transmission` (glass), `clearcoat`, `sheen`, `ior`, `emissive`, `specular`, and `iridescence`.
+- **Smooth Normals**: Use **`autoSmoothAngle`** to achieve soft, rounded shading on curved surfaces without increasing geometry resolution.
 - **Skeletal Animations**: Fully supports parsing and playing hierarchical bone animations defined in the custom SCAD engine, complete with timeline playback controls.
 - **Local File Sync (SCAD Serve)**: Connect the web viewer to the local filesystem using the `openscad-gltf-wasm` CLI. Instantly manage, edit, and save `.scad` files directly from your browser.
 - **Compressed URL Sharing**: Share your designs instantly without a database. The app uses the native `CompressionStream` API to deflate your SCAD code and embed it into the URL hash, making even complex models shareable via a single link.
@@ -47,6 +48,8 @@ A modern, web-based editor and 3D viewer for OpenSCAD. It natively compiles `.sc
 ### 4. Local File Sync (SCAD Serve Backend)
 
 The viewer can connect to a local development environment to save files directly to your hard drive and manage files using the [`openscad-gltf-wasm`](https://github.com/iliagrigorevdev/openscad-gltf-wasm) CLI.
+
+> **Note:** For a cleaner experience, the **SCAD Serve Backend** UI panel is hidden by default. It will only appear automatically when you are accessing the app via `localhost` (e.g., during local development).
 
 **1. Start the local backend server:**
 Run this in your project folder to bridge the web editor to your filesystem.
@@ -86,7 +89,7 @@ npm run dev
 ## 🛠 Tech Stack
 
 - **Framework**: Vanilla JS + [Vite](https://vitejs.dev/)
-- **Core Processing Engine**: [`openscad-gltf-wasm`](https://github.com/iliagrigorevdev/openscad-gltf-wasm)
+- **Core Compiler**: Custom OpenSCAD Emscripten port [`openscad-gltf-wasm`](https://github.com/iliagrigorevdev/openscad-gltf-wasm)
 - **3D Engine**: [Three.js](https://threejs.org/)
 - **Path Tracing**: [three-gpu-pathtracer](https://github.com/gkjohnson/three-gpu-pathtracer)
 - **Compression**: Native browser `CompressionStream` (deflate-raw) for URL state management.
@@ -95,11 +98,18 @@ npm run dev
 
 Because this viewer uses a custom fork of OpenSCAD, you can use powerful new syntax:
 
-**PBR Materials:**
+**PBR Materials & Smoothing:**
 
 ```openscad
-color("white", roughness = 0.1, metalness = 1.0, clearcoat = 1.0, iridescence = 1.0, emissive = [0.2, 0.5, 1.0], emissiveIntensity = 2.0) {
-    sphere(r=10);
+// Use autoSmoothAngle (in degrees) to generate smooth vertex normals.
+// 0.0 (default) = Flat shading. 30-45 = Typical smooth shading.
+color("LightBlue", roughness=0.1, autoSmoothAngle=45) {
+    sphere(r=10, $fn=20); // Even low-poly shapes will look smooth!
+}
+
+// Advanced PBR example
+color("white", metalness=1.0, clearcoat=1.0, iridescence=1.0, autoSmoothAngle=30) {
+    cylinder(h=20, r=5);
 }
 ```
 
