@@ -28,7 +28,6 @@ const lazyUnionCb = document.getElementById("lazy-union-cb");
 const statusEl = document.getElementById("status");
 const viewerEl = document.getElementById("viewer");
 
-const backendSectionEl = document.getElementById("backend-section");
 const backendUrlEl = document.getElementById("backend-url");
 const backendConnectBtn = document.getElementById("backend-connect-btn");
 const backendUiEl = document.getElementById("backend-ui");
@@ -953,7 +952,6 @@ editorEl.placeholder = defaultScad;
     window.location.hostname,
   );
   if (isLocal) {
-    if (backendSectionEl) backendSectionEl.style.display = "flex";
     const url = backendUrlEl.value.trim();
     await connectToServer(url, true);
   }
