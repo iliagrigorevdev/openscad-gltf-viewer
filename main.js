@@ -128,6 +128,19 @@ async function compileAndRender(scadCode) {
     return;
   }
 
+  // Parse model name from SCAD comment
+  const nameMatch = scadCode.match(/\/\*\s*Model Name:\s*(.*?)\s*\*\//i);
+  if (nameMatch && nameMatch[1]) {
+    const extractedName = nameMatch[1]
+      .trim()
+      .replace(/\s+/g, "_")
+      .replace(/[^a-zA-Z0-9_-]/g, "");
+    if (extractedName && modelNameInputEl.value !== extractedName) {
+      modelNameInputEl.value = extractedName;
+      checkChanges(); // Update UI state for backend saving
+    }
+  }
+
   isCompiling = true;
   statusEl.innerText = "Compiling & Processing...";
 
