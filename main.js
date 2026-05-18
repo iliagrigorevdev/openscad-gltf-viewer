@@ -580,6 +580,17 @@ backendSingleSaveBtn.onclick = async () => {
     return;
   }
 
+  const isNew = backendSelectEl.value === "";
+  if (isNew && serverFiles && serverFiles.includes(filename)) {
+    if (
+      !confirm(
+        `A model named "${filename}" already exists. Are you sure you want to overwrite it?`,
+      )
+    ) {
+      return;
+    }
+  }
+
   const payload = {
     filename,
     content: editorEl.value,
