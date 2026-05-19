@@ -23,7 +23,6 @@ const captureImageBtn = document.getElementById("capture-image-btn");
 const shareBtn = document.getElementById("share-btn");
 const autoRenderCb = document.getElementById("auto-render-cb");
 const pathTracingCb = document.getElementById("path-tracing-cb");
-const lazyUnionCb = document.getElementById("lazy-union-cb");
 
 const statusEl = document.getElementById("status");
 const viewerEl = document.getElementById("viewer");
@@ -95,7 +94,6 @@ copyPromptBtn.onclick = async () => {
     iridescence: document.getElementById("opt-pbr-iridescence").checked,
     autoSmoothAngle: document.getElementById("opt-pbr-autosmooth").checked,
     animation: document.getElementById("opt-anim").checked,
-    lazyUnion: lazyUnionCb.checked,
   };
 
   const promptText = generatePrompt(desc, options);
@@ -146,7 +144,6 @@ async function compileAndRender(scadCode) {
   try {
     const opts = {
       wasmUrl: wasmUrl,
-      lazyUnion: lazyUnionCb.checked,
     };
 
     currentGltfData = await convertScadToGltf(scadCode, opts);
@@ -184,10 +181,6 @@ editorEl.addEventListener("input", () => {
 });
 
 autoRenderCb.addEventListener("change", () => {
-  if (autoRenderCb.checked) compileAndRender(getEditorContent());
-});
-
-lazyUnionCb.addEventListener("change", () => {
   if (autoRenderCb.checked) compileAndRender(getEditorContent());
 });
 
