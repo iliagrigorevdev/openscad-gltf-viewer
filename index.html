@@ -46,33 +46,10 @@
             Describe the object you want to generate. The copied prompt will
             include advanced PBR and Animation rules based on your selection.
           </p>
-          <div id="prompt-options" class="toggles">
+          <div id="prompt-options" class="toggles" style="margin-bottom: 8px">
             <label
               ><input type="checkbox" id="opt-pbr-basic" checked /> Basic
               PBR</label
-            >
-            <label
-              ><input type="checkbox" id="opt-pbr-transmission" checked />
-              Transmission</label
-            >
-            <label
-              ><input type="checkbox" id="opt-pbr-clearcoat" checked />
-              Clearcoat</label
-            >
-            <label
-              ><input type="checkbox" id="opt-pbr-sheen" checked /> Sheen</label
-            >
-            <label
-              ><input type="checkbox" id="opt-pbr-emissive" checked />
-              Emissive</label
-            >
-            <label
-              ><input type="checkbox" id="opt-pbr-specular" checked />
-              Specular</label
-            >
-            <label
-              ><input type="checkbox" id="opt-pbr-iridescence" checked />
-              Iridescence</label
             >
             <label
               ><input type="checkbox" id="opt-pbr-autosmooth" checked /> Auto
@@ -82,6 +59,77 @@
               ><input type="checkbox" id="opt-anim" checked /> Animations</label
             >
           </div>
+
+          <div class="prompt-group">
+            <div class="prompt-group-header">
+              <span>Extended PBR</span>
+              <label
+                ><input type="checkbox" id="opt-pbr-all" checked /> Enable
+                All</label
+              >
+            </div>
+            <div
+              class="toggles nested"
+              id="pbr-children"
+              style="margin-bottom: 0"
+            >
+              <label
+                ><input
+                  type="checkbox"
+                  class="pbr-child"
+                  id="opt-pbr-transmission"
+                  checked
+                />
+                Transmission</label
+              >
+              <label
+                ><input
+                  type="checkbox"
+                  class="pbr-child"
+                  id="opt-pbr-clearcoat"
+                  checked
+                />
+                Clearcoat</label
+              >
+              <label
+                ><input
+                  type="checkbox"
+                  class="pbr-child"
+                  id="opt-pbr-sheen"
+                  checked
+                />
+                Sheen</label
+              >
+              <label
+                ><input
+                  type="checkbox"
+                  class="pbr-child"
+                  id="opt-pbr-emissive"
+                  checked
+                />
+                Emissive</label
+              >
+              <label
+                ><input
+                  type="checkbox"
+                  class="pbr-child"
+                  id="opt-pbr-specular"
+                  checked
+                />
+                Specular</label
+              >
+              <label
+                ><input
+                  type="checkbox"
+                  class="pbr-child"
+                  id="opt-pbr-iridescence"
+                  checked
+                />
+                Iridescence</label
+              >
+            </div>
+          </div>
+
           <textarea
             id="prompt-desc"
             rows="2"

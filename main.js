@@ -82,6 +82,25 @@ pathTracingCb.addEventListener("change", () => {
 modelNameInputEl.addEventListener("input", checkChanges);
 
 // --- Prompt Logic ---
+const pbrAllBtn = document.getElementById("opt-pbr-all");
+const pbrChildren = document.querySelectorAll(".pbr-child");
+
+if (pbrAllBtn && pbrChildren.length > 0) {
+  pbrAllBtn.addEventListener("change", (e) => {
+    const checked = e.target.checked;
+    pbrChildren.forEach((cb) => (cb.checked = checked));
+  });
+
+  pbrChildren.forEach((cb) => {
+    cb.addEventListener("change", () => {
+      const allChecked = Array.from(pbrChildren).every((c) => c.checked);
+      const someChecked = Array.from(pbrChildren).some((c) => c.checked);
+      pbrAllBtn.checked = allChecked;
+      pbrAllBtn.indeterminate = someChecked && !allChecked;
+    });
+  });
+}
+
 copyPromptBtn.onclick = async () => {
   const desc = promptDescEl.value.trim() || "an object";
   const options = {
