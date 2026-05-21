@@ -804,6 +804,16 @@ function clearCurrentMesh() {
 
 function rebuildSceneFromGLTF(gltfData) {
   return new Promise((resolve, reject) => {
+    let oldBox = null;
+    if (currentMesh) {
+      // Temporarily set animation time to 0 to compare the base mesh bounding box correctly
+      if (mixer && currentAction) {
+        currentAction.time = 0;
+        mixer.update(0);
+      }
+      oldBox = new THREE.Box3().setFromObject(currentMesh);
+    }
+
     clearCurrentMesh();
 
     // Parse the data directly
@@ -847,7 +857,29 @@ function rebuildSceneFromGLTF(gltfData) {
         });
 
         scene.add(currentMesh);
-        fitCamera();
+
+        let geometryChanged = true;
+        if (oldBox && !oldBox.isEmpty()) {
+          const newBox = new THREE.Box3().setFromObject(currentMesh);
+          if (!newBox.isEmpty()) {
+            const epsilon = 0.001; // Allow minor float inaccuracies from GLTF conversions
+            if (
+              oldBox.min.distanceTo(newBox.min) < epsilon &&
+              oldBox.max.distanceTo(newBox.max) < epsilon
+            ) {
+              geometryChanged = false;
+            }
+          }
+        }
+
+        // Only reset the camera and lighting bounds if the object boundaries changed
+        if (geometryChanged) {
+          fitCamera();
+        } else {
+          // Still register the new meshes & materials into the GPU path tracer
+          pathTracer.setScene(scene, camera);
+        }
+
         resolve();
       },
       reject,
