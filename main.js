@@ -182,18 +182,16 @@ async function compileAndRender(scadCode) {
     return;
   }
 
-  // Parse model name from SCAD comment (only if it's a new model to avoid desync with backend)
-  if (currentModelOriginalState.isNew) {
-    const nameMatch = scadCode.match(/\/\*\s*Model Name:\s*(.*?)\s*\*\//i);
-    if (nameMatch && nameMatch[1]) {
-      const extractedName = nameMatch[1]
-        .trim()
-        .replace(/\s+/g, "_")
-        .replace(/[^a-zA-Z0-9_-]/g, "");
-      if (extractedName && modelNameInputEl.value !== extractedName) {
-        modelNameInputEl.value = extractedName;
-        checkChanges(); // Update UI state for backend saving
-      }
+  // Parse model name from SCAD comment
+  const nameMatch = scadCode.match(/\/\*\s*Model Name:\s*(.*?)\s*\*\//i);
+  if (nameMatch && nameMatch[1]) {
+    const extractedName = nameMatch[1]
+      .trim()
+      .replace(/\s+/g, "_")
+      .replace(/[^a-zA-Z0-9_-]/g, "");
+    if (extractedName && modelNameInputEl.value !== extractedName) {
+      modelNameInputEl.value = extractedName;
+      checkChanges(); // Update UI state for backend saving
     }
   }
 
@@ -583,13 +581,12 @@ backendSelectEl.addEventListener("change", async () => {
 
     // Enforce empty editor behavior for new models
     editorEl.value = "";
+    compileAndRender(getEditorContent());
 
     currentModelOriginalState = {
       isNew: true,
       content: "",
     };
-
-    compileAndRender(getEditorContent());
     checkChanges();
   } else {
     const filename = serverFiles[idx];
@@ -607,14 +604,12 @@ backendSelectEl.addEventListener("change", async () => {
       }
       const data = await res.json();
       editorEl.value = data.content;
+      compileAndRender(getEditorContent());
 
-      // Update state BEFORE compiling so the extraction logic knows this is an existing file
       currentModelOriginalState = {
         isNew: false,
         content: data.content,
       };
-
-      compileAndRender(getEditorContent());
       checkChanges();
     } catch (err) {
       alert("Error loading model: " + err.message);
