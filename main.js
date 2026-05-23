@@ -130,6 +130,44 @@ copyPromptBtn.onclick = async () => {
 };
 
 // --- SCAD Compilation ---
+
+// Automatically resolve and fetch dependencies for include/use directives
+async function fetchDependencies(code) {
+  const additionalFiles = {};
+  if (!isServerConnected) return additionalFiles;
+
+  const visited = new Set();
+
+  async function traverse(currentCode) {
+    const regex = /(?:include|use)\s*([<"])([^>"]+)([>"])/g;
+    let match;
+    while ((match = regex.exec(currentCode)) !== null) {
+      const relPath = match[2];
+      // scad-serve handles root flat-directory currently, so we extract baseName
+      const baseName = relPath.split(/[/\\]/).pop();
+
+      if (!visited.has(relPath)) {
+        visited.add(relPath);
+        try {
+          const res = await fetch(
+            `${currentBackendUrl}/api/scads/${encodeURIComponent(baseName)}`,
+          );
+          if (res.ok) {
+            const data = await res.json();
+            additionalFiles[relPath] = data.content; // Map to the exact relative path
+            await traverse(data.content);
+          }
+        } catch (err) {
+          console.warn(`Failed to load dependency: ${relPath}`);
+        }
+      }
+    }
+  }
+
+  await traverse(code);
+  return additionalFiles;
+}
+
 async function compileAndRender(scadCode) {
   if (typeof scadCode !== "string") return;
   if (isCompiling) {
@@ -163,8 +201,10 @@ async function compileAndRender(scadCode) {
   statusEl.innerText = "Compiling & Processing...";
 
   try {
+    const additionalFiles = await fetchDependencies(scadCode);
     const opts = {
       wasmUrl: wasmUrl,
+      additionalFiles: additionalFiles,
     };
 
     currentGltfData = await convertScadToGltf(scadCode, opts);
