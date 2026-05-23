@@ -32,6 +32,7 @@ const backendConnectBtn = document.getElementById("backend-connect-btn");
 const backendUiEl = document.getElementById("backend-ui");
 const backendSelectEl = document.getElementById("backend-select");
 const backendSingleSaveBtn = document.getElementById("backend-single-save-btn");
+const backendDeleteBtn = document.getElementById("backend-delete-btn");
 
 const animControlsSection = document.getElementById("anim-controls-section");
 const animPlayBtn = document.getElementById("anim-play-btn");
@@ -467,6 +468,11 @@ function renderBackendSelect() {
   }
   // Restore current selection tracker
   backendSelectEl.value = currentSelectedModelIdx;
+
+  if (backendDeleteBtn) {
+    backendDeleteBtn.style.display =
+      currentSelectedModelIdx === "" ? "none" : "flex";
+  }
 }
 
 // Helper to grab and clean up names from the inputs or dropdown
@@ -576,6 +582,10 @@ backendSelectEl.addEventListener("change", async () => {
   const idx = backendSelectEl.value;
   currentSelectedModelIdx = idx;
 
+  if (backendDeleteBtn) {
+    backendDeleteBtn.style.display = idx === "" ? "none" : "flex";
+  }
+
   if (idx === "") {
     modelNameInputEl.value = "";
 
@@ -681,6 +691,55 @@ backendSingleSaveBtn.onclick = async () => {
   } catch (err) {
     checkChanges(); // Reset text to correct changed state
     alert("Error: " + err.message);
+  }
+};
+
+backendDeleteBtn.onclick = async () => {
+  const idx = backendSelectEl.value;
+  if (idx === "") return;
+
+  const filename = serverFiles[idx];
+  if (!confirm(`Are you sure you want to delete "${filename}"?`)) {
+    return;
+  }
+
+  try {
+    backendDeleteBtn.innerText = "Deleting...";
+
+    const res = await fetch(
+      `${currentBackendUrl}/api/scads/${encodeURIComponent(filename)}`,
+      {
+        method: "DELETE",
+      },
+    );
+
+    if (!res.ok) {
+      let errorMsg = "Delete failed";
+      try {
+        const errData = await res.json();
+        if (errData.error) errorMsg = errData.error;
+      } catch (e) {}
+      throw new Error(errorMsg);
+    }
+
+    serverFiles = await fetchBackendFiles(currentBackendUrl);
+
+    currentSelectedModelIdx = "";
+    renderBackendSelect();
+
+    modelNameInputEl.value = "";
+    editorEl.value = "";
+    compileAndRender(getEditorContent());
+
+    currentModelOriginalState = {
+      isNew: true,
+      content: "",
+    };
+    checkChanges();
+    backendDeleteBtn.innerText = "Delete";
+  } catch (err) {
+    alert("Error: " + err.message);
+    backendDeleteBtn.innerText = "Delete";
   }
 };
 

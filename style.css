@@ -145,6 +145,13 @@ button.primary {
 button.primary:hover {
   background: #0077ee;
 }
+button.danger {
+  background: #cc0000;
+  border-color: #aa0000;
+}
+button.danger:hover {
+  background: #ee0000;
+}
 
 .controls-row {
   display: flex;
@@ -285,7 +292,8 @@ input[type="range"]::-moz-range-thumb {
   min-width: 0;
 }
 
-#backend-single-save-btn {
+#backend-single-save-btn,
+#backend-delete-btn {
   flex-shrink: 0;
 }
 
