@@ -751,7 +751,7 @@ const camera = new THREE.PerspectiveCamera(
   0.1,
   2000,
 );
-camera.position.set(50, 50, 50);
+camera.position.set(50, 50, -50);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(viewerEl.clientWidth, viewerEl.clientHeight);
@@ -1006,7 +1006,7 @@ function fitCamera() {
   camera.position.set(
     center.x + distance * 0.8,
     center.y + distance * 0.8,
-    center.z + distance * 0.8,
+    center.z - distance * 0.8,
   );
   camera.lookAt(center);
   controls.target.copy(center);
@@ -1015,7 +1015,7 @@ function fitCamera() {
   dirLight.position.set(
     center.x + maxDim,
     center.y + maxDim * 1.5,
-    center.z + maxDim,
+    center.z - maxDim,
   );
   dirLight.target.position.copy(center);
   dirLight.target.updateMatrixWorld();
