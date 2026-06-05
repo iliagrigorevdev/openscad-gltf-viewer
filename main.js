@@ -113,6 +113,8 @@ copyPromptBtn.onclick = async () => {
     specular: document.getElementById("opt-pbr-specular").checked,
     iridescence: document.getElementById("opt-pbr-iridescence").checked,
     autoSmoothAngle: document.getElementById("opt-pbr-autosmooth").checked,
+    bakeColors: document.getElementById("opt-bake-colors").checked,
+    bakeNormals: document.getElementById("opt-bake-normals").checked,
     animation: document.getElementById("opt-anim").checked,
   };
 
